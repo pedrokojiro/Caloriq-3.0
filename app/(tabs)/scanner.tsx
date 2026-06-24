@@ -101,7 +101,7 @@ export default function ScannerScreen() {
     ).start();
   }, [pulseAnim]);
 
-  const startScanningWithImage = async (uri: string) => {
+  const startScanningWithImage = async (uri: string, base64: string | null = null) => {
     const preset = PRESETS[selectedPresetIndex];
     setScanningPreset(preset);
     setIsProcessing(true);
@@ -111,7 +111,7 @@ export default function ScannerScreen() {
       // Simulate step 1 (detecting food)
       setTimeout(() => setProcessingStep(1), 500);
       
-      const analysisResult = await analyzeMealImage(uri, preset.name);
+      const analysisResult = await analyzeMealImage(uri, base64, preset.name);
       
       // Complete step 2 and 3
       setProcessingStep(2);
@@ -152,12 +152,14 @@ export default function ScannerScreen() {
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
+        base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const uri = result.assets[0].uri;
+        const base64 = result.assets[0].base64 || null;
         setImageUri(uri);
-        startScanningWithImage(uri);
+        startScanningWithImage(uri, base64);
       }
     } catch (error) {
       console.log('Error taking photo:', error);
@@ -186,12 +188,14 @@ export default function ScannerScreen() {
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
+        base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const uri = result.assets[0].uri;
+        const base64 = result.assets[0].base64 || null;
         setImageUri(uri);
-        startScanningWithImage(uri);
+        startScanningWithImage(uri, base64);
       }
     } catch (error) {
       console.log('Error picking image:', error);
@@ -239,9 +243,10 @@ export default function ScannerScreen() {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         
         const dataUrl = canvas.toDataURL('image/jpeg');
+        const base64 = dataUrl.split(',')[1];
         setImageUri(dataUrl);
         stopWebcam();
-        startScanningWithImage(dataUrl);
+        startScanningWithImage(dataUrl, base64);
       }
     }
   };

@@ -40,9 +40,9 @@ export interface ScannedMeal {
   insights: string;
 }
 
-export const analyzeMealImage = async (imageUri: string, presetName?: string): Promise<ScannedMeal> => {
+export const analyzeMealImage = async (imageUri: string, base64Data: string | null, presetName?: string): Promise<ScannedMeal> => {
   try {
-    const base64Image = await uriToBase64(imageUri);
+    const base64Image = base64Data || await uriToBase64(imageUri);
     
     const prompt = `Analise a foto desta refeição. Retorne um objeto JSON com as informações nutricionais estimadas. 
 Use exatamente a seguinte estrutura JSON:
