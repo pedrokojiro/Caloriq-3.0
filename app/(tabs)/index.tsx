@@ -334,6 +334,14 @@ export default function DashboardScreen() {
           <View style={styles.bottomSpacer} />
         </View>
       </ScrollView>
+
+      {/* Botão Flutuante (FAB) do Chat IA */}
+      <Pressable 
+        style={[styles.fab, { backgroundColor: globalColors.primary }]}
+        onPress={() => router.push('/(modals)/ai-chat')}
+      >
+        <Ionicons name="chatbubbles" size={24} color="#FFFFFF" />
+      </Pressable>
     </BaseScreen>
   );
 }
@@ -715,6 +723,22 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 100, // Reserve space so bottom tabs don't cut off anything
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 90,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 8,
+    zIndex: 999,
   },
 });
 
