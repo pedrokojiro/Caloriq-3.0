@@ -1,0 +1,342 @@
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { BaseScreen } from '../../src/components';
+import { useAppState } from '../../src/hooks/useAppState';
+import { useTheme } from '../../src/hooks/useTheme';
+import { chatWithGemini } from '../../src/services/gemini';
+
+interface Message {
+  id: string;
+  text: string;
+  sender: 'bot' | 'user';
+  time: string;
+}
+
+export default function AIChatModal() {
+  const router = useRouter();
+  const { colors, globalColors } = useTheme();
+  const { state } = useAppState();
+  const scrollRef = useRef<ScrollView>(null);
+
+  const [inputVal, setInputVal] = useState('');
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      text: `Olá, ${state.profile.name}! Sou seu assistente nutricional CaloriQ. 🤖`,
+      sender: 'bot',
+      time: '09:41',
+    },
+    {
+      id: '2',
+      text: 'Analisei seu diário de hoje e notei que você consumiu bastante proteína no almoço, mas ainda faltam cerca de 52g para atingir sua meta diária de 150g. Como posso te ajudar a bater esse alvo?',
+      sender: 'bot',
+      time: '09:41',
+    },
+  ]);
+  const [isTyping, setIsTyping] = useState(false);
+
+  // Auto scroll to bottom when messages change
+  useEffect(() => {
+    setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  }, [messages, isTyping]);
+
+  const handleSend = async () => {
+    if (!inputVal.trim()) return;
+
+    const userText = inputVal.trim();
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    const userMsg: Message = {
+      id: `msg-${Date.now()}`,
+      text: userText,
+      sender: 'user',
+      time: timeStr,
+    };
+
+    setMessages((prev) => [...prev, userMsg]);
+    setInputVal('');
+    setIsTyping(true);
+
+    try {
+      // Build history for Gemini
+      const geminiHistory = messages.map(msg => ({
+        role: msg.sender === 'user' ? 'user' as const : 'model' as const,
+        parts: [{ text: msg.text }]
+      }));
+
+      // Call Gemini API
+      const botResponse = await chatWithGemini(userText, geminiHistory);
+
+      const botMsg: Message = {
+        id: `msg-${Date.now() + 1}`,
+        text: botResponse,
+        sender: 'bot',
+        time: timeStr,
+      };
+
+      setIsTyping(false);
+      setMessages((prev) => [...prev, botMsg]);
+    } catch (err) {
+      console.log("Erro no chat com o Gemini:", err);
+      setIsTyping(false);
+      
+      const errorMsg: Message = {
+        id: `msg-${Date.now() + 1}`,
+        text: "Desculpe, tive um problema ao me conectar com meus servidores do Gemini. Pode tentar enviar sua mensagem novamente?",
+        sender: 'bot',
+        time: timeStr,
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    }
+  };
+
+  return (
+    <BaseScreen edges={['left', 'right']} style={{ backgroundColor: colors.bgApp }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardView}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 44 : 0}
+      >
+        {/* Header */}
+        <View style={[styles.header, { backgroundColor: colors.bgCard, borderBottomColor: colors.borderColor }]}>
+          <Pressable onPress={() => router.dismiss()} style={styles.backBtn}>
+            <Ionicons name="close" size={24} color={colors.textMain} />
+          </Pressable>
+          <View style={styles.headerInfo}>
+            <LinearGradient
+              colors={[globalColors.primaryGlow, globalColors.primary]}
+              style={styles.botAvatar}
+            >
+              <Text style={{ fontSize: 16 }}>🤖</Text>
+            </LinearGradient>
+            <View>
+              <Text style={[styles.botName, { color: colors.textMain }]}>NutriCaloriQ IA</Text>
+              <View style={styles.onlineRow}>
+                <View style={[styles.onlineDot, { backgroundColor: globalColors.primary }]} />
+                <Text style={[styles.onlineText, { color: colors.textLight }]}>Online</Text>
+              </View>
+            </View>
+          </View>
+          <View style={{ width: 36 }} />
+        </View>
+
+        {/* Messages Stream */}
+        <ScrollView
+          ref={scrollRef}
+          style={styles.messageScroll}
+          contentContainerStyle={styles.messageContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {messages.map((msg) => {
+            const isBot = msg.sender === 'bot';
+            return (
+              <View
+                key={msg.id}
+                style={[
+                  styles.messageBubbleWrapper,
+                  isBot ? styles.alignLeft : styles.alignRight,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.messageBubble,
+                    isBot
+                      ? [styles.botBubble, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]
+                      : [styles.userBubble, { backgroundColor: globalColors.primary }],
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.messageText,
+                      isBot ? { color: colors.textMain } : { color: '#FFFFFF' },
+                    ]}
+                  >
+                    {msg.text}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.messageTime,
+                      isBot ? { color: colors.textLight } : { color: 'rgba(255, 255, 255, 0.7)' },
+                    ]}
+                  >
+                    {msg.time}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
+
+          {isTyping && (
+            <View style={[styles.messageBubbleWrapper, styles.alignLeft]}>
+              <View style={[styles.messageBubble, styles.botBubble, { backgroundColor: colors.bgCard, borderColor: colors.borderColor, flexDirection: 'row', gap: 4 }]}>
+                <View style={[styles.typingDot, { backgroundColor: colors.textLight }]} />
+                <View style={[styles.typingDot, { backgroundColor: colors.textLight, opacity: 0.6 }]} />
+                <View style={[styles.typingDot, { backgroundColor: colors.textLight, opacity: 0.3 }]} />
+              </View>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Input panel */}
+        <View style={[styles.inputPanel, { backgroundColor: colors.bgCard, borderTopColor: colors.borderColor, paddingBottom: Platform.OS === 'ios' ? 24 : 12 }]}>
+          <TextInput
+            value={inputVal}
+            onChangeText={setInputVal}
+            placeholder="Pergunte algo sobre sua dieta..."
+            placeholderTextColor={colors.textLight}
+            style={[styles.textInput, { color: colors.textMain, backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}
+            onSubmitEditing={handleSend}
+          />
+          <Pressable
+            onPress={handleSend}
+            style={[styles.sendBtn, { backgroundColor: globalColors.primary }]}
+          >
+            <Ionicons name="send" size={16} color="#FFFFFF" />
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    </BaseScreen>
+  );
+}
+
+const styles = StyleSheet.create({
+  keyboardView: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    ...Platform.select({
+      ios: {
+        paddingTop: 44,
+      },
+    }),
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  botAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  botName: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  onlineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  onlineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  onlineText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  messageScroll: {
+    flex: 1,
+  },
+  messageContent: {
+    flexGrow: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 14,
+  },
+  messageBubbleWrapper: {
+    width: '100%',
+    flexDirection: 'row',
+  },
+  alignLeft: {
+    justifyContent: 'flex-start',
+  },
+  alignRight: {
+    justifyContent: 'flex-end',
+  },
+  messageBubble: {
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    maxWidth: '80%',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+      },
+      android: {
+        elevation: 1,
+      },
+    }),
+  },
+  botBubble: {
+    borderWidth: 1,
+    borderTopLeftRadius: 4,
+  },
+  userBubble: {
+    borderTopRightRadius: 4,
+  },
+  messageText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  messageTime: {
+    fontSize: 9,
+    alignSelf: 'flex-end',
+    marginTop: 6,
+  },
+  typingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  inputPanel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderTopWidth: 1,
+    gap: 8,
+  },
+  textInput: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    height: 48,
+    paddingHorizontal: 16,
+    fontSize: 14,
+  },
+  sendBtn: {
+    width: 44,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
+
