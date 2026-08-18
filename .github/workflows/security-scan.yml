@@ -1,0 +1,52 @@
+name: Security & SAST Analysis
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  security-audit:
+    name: Audit Dependencies & Secrets
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 1. Auditoria de vulnerabilidades em bibliotecas e dependências (package.json)
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+        continue-on-error: true # Permite a execução prosseguir exibindo os avisos de segurança
+
+      # 2. Varredura de credenciais, chaves de API e segredos expostos no código
+      - name: Secret Scan with Trufflehog
+        uses: trufflesecurity/trufflehog-action@main
+        with:
+          extra_args: --only-verified
+
+  codeql-analysis:
+    name: SAST Code Analysis (CodeQL)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 3. Análise Estática de Segurança de Código (SAST) nativa do GitHub para JavaScript/TypeScript
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: 'javascript-typescript'
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
