@@ -20,14 +20,14 @@ jobs:
         with:
           node-version: '20'
 
-      # 1. Auditoria de vulnerabilidades em bibliotecas e dependências (package.json)
+      # 1. Auditoria de vulnerabilidades em dependências (package.json)
       - name: Run npm audit
         run: npm audit --audit-level=high
-        continue-on-error: true # Permite a execução prosseguir exibindo os avisos de segurança
+        continue-on-error: true
 
-      # 2. Varredura de credenciais, chaves de API e segredos expostos no código
+      # 2. Varredura de credenciais e chaves de API expostas
       - name: Secret Scan with Trufflehog
-        uses: trufflesecurity/trufflehog-action@main
+        uses: trufflesecurity/trufflehog@main
         with:
           extra_args: --only-verified
 
@@ -42,7 +42,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 3. Análise Estática de Segurança de Código (SAST) nativa do GitHub para JavaScript/TypeScript
+      # 3. Análise Estática de Segurança de Código (SAST)
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
