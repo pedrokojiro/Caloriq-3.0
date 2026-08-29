@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, Alert, Platform } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, Alert, Platform, KeyboardAvoidingView } from 'react-native';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAppState } from '../../src/hooks/useAppState';
 import { BaseScreen, Card, Input, Button } from '../../src/components';
@@ -15,6 +15,13 @@ export default function GoalsScreen() {
   const [carbs, setCarbs] = useState(state.goals.carbs.toString());
   const [fat, setFat] = useState(state.goals.fat.toString());
   const [water, setWater] = useState(state.goals.water.toString());
+  const [focusedField, setFocusedField] = useState<string | null>(null);
+
+  const focusProps = (field: string) => ({
+    focused: focusedField === field,
+    onFocus: () => setFocusedField(field),
+    onBlur: () => setFocusedField((current) => current === field ? null : current),
+  });
 
   const handleSave = () => {
     const numWeight = parseFloat(weight);
@@ -57,11 +64,18 @@ export default function GoalsScreen() {
         <Text style={[styles.headerSubtitle, { color: colors.textLight }]}>Ajuste seus objetivos diários</Text>
       </View>
 
-      <ScrollView 
-        style={styles.scroll}
-        contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.bgApp }]}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={styles.keyboardArea}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.bgApp }]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+        >
         {/* Personal Target Card */}
         <Card style={styles.card}>
           <View style={styles.cardHeader}>
@@ -76,6 +90,7 @@ export default function GoalsScreen() {
             onChangeText={setWeight}
             placeholder="Ex: 75"
             keyboardType="numeric"
+            {...focusProps('weight')}
           />
         </Card>
 
@@ -94,6 +109,7 @@ export default function GoalsScreen() {
             onChangeText={setCalories}
             placeholder="Ex: 2000"
             keyboardType="numeric"
+            {...focusProps('calories')}
           />
 
           <Input
@@ -102,6 +118,7 @@ export default function GoalsScreen() {
             onChangeText={setWater}
             placeholder="Ex: 2500"
             keyboardType="numeric"
+            {...focusProps('water')}
           />
         </Card>
 
@@ -121,6 +138,7 @@ export default function GoalsScreen() {
             placeholder="Ex: 150"
             keyboardType="numeric"
             inputStyle={{ color: globalColors.protein, fontWeight: '700' }}
+            {...focusProps('protein')}
           />
 
           <Input
@@ -130,6 +148,7 @@ export default function GoalsScreen() {
             placeholder="Ex: 200"
             keyboardType="numeric"
             inputStyle={{ color: globalColors.carbs, fontWeight: '700' }}
+            {...focusProps('carbs')}
           />
 
           <Input
@@ -139,6 +158,7 @@ export default function GoalsScreen() {
             placeholder="Ex: 65"
             keyboardType="numeric"
             inputStyle={{ color: globalColors.fat, fontWeight: '700' }}
+            {...focusProps('fat')}
           />
         </Card>
 
@@ -151,17 +171,24 @@ export default function GoalsScreen() {
         />
 
         <View style={styles.bottomSpacer} />
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </BaseScreen>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardArea: {
+    flex: 1,
+  },
   scroll: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
     paddingHorizontal: 20,
     paddingTop: 16,
   },
@@ -169,6 +196,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderBottomWidth: 1,
+    width: '100%',
     ...Platform.select({
       ios: {
         paddingTop: 48,

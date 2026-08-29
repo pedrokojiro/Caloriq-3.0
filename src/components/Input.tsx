@@ -13,6 +13,9 @@ interface InputProps {
   inputStyle?: StyleProp<TextStyle>;
   rightIcon?: React.ReactNode;
   onRightIconPress?: () => void;
+  focused?: boolean;
+  onFocus?: () => void;
+  onBlur?: () => void;
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -26,9 +29,13 @@ export const Input: React.FC<InputProps> = ({
   inputStyle,
   rightIcon,
   onRightIconPress,
+  focused,
+  onFocus,
+  onBlur,
 }) => {
   const { colors, globalColors } = useTheme();
-  const [isFocused, setIsFocused] = useState(false);
+  const [internalFocus, setInternalFocus] = useState(false);
+  const isFocused = focused ?? internalFocus;
 
   return (
     <View style={[styles.container, style]}>
@@ -58,8 +65,14 @@ export const Input: React.FC<InputProps> = ({
           placeholderTextColor={colors.textLight}
           secureTextEntry={secureTextEntry}
           keyboardType={keyboardType}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          onFocus={() => {
+            setInternalFocus(true);
+            onFocus?.();
+          }}
+          onBlur={() => {
+            setInternalFocus(false);
+            onBlur?.();
+          }}
           style={[styles.input, { color: colors.textMain }, inputStyle]}
         />
         {rightIcon && (

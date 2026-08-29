@@ -99,7 +99,7 @@ export default function AIChatModal() {
   };
 
   return (
-    <BaseScreen edges={['left', 'right']} style={{ backgroundColor: colors.bgApp }}>
+    <BaseScreen edges={['top', 'bottom', 'left', 'right']} style={{ backgroundColor: colors.bgApp }}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
@@ -134,6 +134,8 @@ export default function AIChatModal() {
           style={styles.messageScroll}
           contentContainerStyle={styles.messageContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         >
           {messages.map((msg) => {
             const isBot = msg.sender === 'bot';
@@ -186,7 +188,7 @@ export default function AIChatModal() {
         </ScrollView>
 
         {/* Input panel */}
-        <View style={[styles.inputPanel, { backgroundColor: colors.bgCard, borderTopColor: colors.borderColor, paddingBottom: Platform.OS === 'ios' ? 24 : 12 }]}>
+        <View style={[styles.inputPanel, { backgroundColor: colors.bgCard, borderTopColor: colors.borderColor }]}>
           <TextInput
             value={inputVal}
             onChangeText={setInputVal}
@@ -215,14 +217,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    ...Platform.select({
-      ios: {
-        paddingTop: 44,
-      },
-    }),
   },
   backBtn: {
     width: 36,
@@ -232,9 +229,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerInfo: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 10,
+    minWidth: 0,
   },
   botAvatar: {
     width: 38,
@@ -246,6 +246,7 @@ const styles = StyleSheet.create({
   botName: {
     fontSize: 15,
     fontWeight: '700',
+    flexShrink: 1,
   },
   onlineRow: {
     flexDirection: 'row',
@@ -266,6 +267,9 @@ const styles = StyleSheet.create({
   },
   messageContent: {
     flexGrow: 1,
+    width: '100%',
+    maxWidth: 840,
+    alignSelf: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
     gap: 14,
@@ -284,7 +288,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    maxWidth: '80%',
+    maxWidth: '88%',
+    minWidth: 72,
+    flexShrink: 1,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -307,11 +313,13 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 14,
     lineHeight: 20,
+    flexShrink: 1,
   },
   messageTime: {
     fontSize: 9,
     alignSelf: 'flex-end',
     marginTop: 6,
+    paddingHorizontal: 2,
   },
   typingDot: {
     width: 6,
@@ -322,6 +330,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
+    width: '100%',
     borderTopWidth: 1,
     gap: 8,
   },
