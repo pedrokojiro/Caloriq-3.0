@@ -108,3 +108,13 @@ O aplicativo persiste perfil, metas, refeições, ingredientes e consumo de águ
 5. Em outro terminal, inicie o Expo normalmente. No emulador Android, use `EXPO_PUBLIC_API_URL=http://10.0.2.2:3333`. Em celular físico, substitua `localhost` pelo IP do computador na mesma rede Wi-Fi.
 
 A rota `GET http://localhost:3333/health` confirma a conexão. Caso a API esteja desligada, o aplicativo mantém os dados de demonstração e mostra avisos apenas no console.
+
+## 🎓 Modo apresentação sem dependência externa
+
+Para uma apresentação com risco zero de cota, internet ou indisponibilidade do Gemini, defina no `.env`:
+
+```env
+EXPO_PUBLIC_AI_DEMO_MODE=true
+```
+
+Reinicie o Expo depois da alteração. A câmera e a galeria continuam funcionando, mas o resultado nutricional vem dos presets locais e nenhuma requisição é enviada ao Gemini. Com `false`, o app usa o Gemini normalmente e, na web, muda automaticamente para os dados locais se a chamada falhar.

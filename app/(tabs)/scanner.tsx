@@ -103,9 +103,25 @@ export default function ScannerScreen() {
 
   const startScanningWithImage = async (uri: string, base64: string | null = null) => {
     const preset = PRESETS[selectedPresetIndex];
+    const useDemoResult = () => {
+      setIsProcessing(false);
+      router.push({
+        pathname: '/(modals)/meal-result',
+        params: { foodName: preset.name, imageUri: uri },
+      });
+    };
     setScanningPreset(preset);
     setIsProcessing(true);
     setProcessingStep(0);
+
+    if (process.env.EXPO_PUBLIC_AI_DEMO_MODE === 'true') {
+      setTimeout(() => setProcessingStep(1), 400);
+      setTimeout(() => {
+        setProcessingStep(2);
+        setTimeout(useDemoResult, 400);
+      }, 900);
+      return;
+    }
 
     try {
       // Simulate step 1 (detecting food)
@@ -131,11 +147,15 @@ export default function ScannerScreen() {
     } catch (err) {
       console.log("Erro no escaneamento com Gemini:", err);
       setIsProcessing(false);
-      const useDemoResult = () => router.push({
-        pathname: '/(modals)/meal-result',
-        params: { foodName: preset.name, imageUri: uri },
-      });
       const isCapacityError = err instanceof GeminiServiceError && ['QUOTA', 'UNAVAILABLE', 'TIMEOUT'].includes(err.code);
+      if (Platform.OS === 'web') {
+        Alert.alert(
+          isCapacityError ? 'IA temporariamente ocupada' : 'IA indisponível',
+          'O Caloriq continuará automaticamente com os dados locais de apresentação.'
+        );
+        useDemoResult();
+        return;
+      }
       Alert.alert(
         isCapacityError ? 'IA temporariamente ocupada' : 'Não foi possível analisar',
         isCapacityError
