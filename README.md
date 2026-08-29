@@ -78,3 +78,33 @@ EXPO_PUBLIC_GEMINI_MODEL=gemini-2.5-flash
 Reinicie o Expo depois da alteração. Em erros temporários, o scanner tenta novamente uma vez; se a cota continuar indisponível, permite continuar claramente em modo de demonstração com dados locais.
 
 > Em uma versão publicada, `EXPO_PUBLIC_*` não é segredo. Mova a chamada do Gemini para um backend/proxy. Esta configuração serve para desenvolvimento e apresentação controlada.
+
+## 🐘 Banco de dados PostgreSQL local
+
+O aplicativo persiste perfil, metas, refeições, ingredientes e consumo de água por meio de uma API local. O React Native não acessa o PostgreSQL diretamente.
+
+1. Instale o PostgreSQL 17 e mantenha o serviço na porta `5432`.
+2. Crie o banco usando o terminal do PostgreSQL:
+
+   ```sql
+   CREATE DATABASE caloriq;
+   ```
+
+3. No `.env`, ajuste a conexão se sua senha for diferente:
+
+   ```env
+   DATABASE_URL=postgresql://postgres:troque_esta_senha@localhost:5432/caloriq
+   EXPO_PUBLIC_API_URL=http://localhost:3333
+   API_PORT=3333
+   ```
+
+4. Prepare as tabelas e inicie a API:
+
+   ```bash
+   npm run db:migrate
+   npm run api
+   ```
+
+5. Em outro terminal, inicie o Expo normalmente. No emulador Android, use `EXPO_PUBLIC_API_URL=http://10.0.2.2:3333`. Em celular físico, substitua `localhost` pelo IP do computador na mesma rede Wi-Fi.
+
+A rota `GET http://localhost:3333/health` confirma a conexão. Caso a API esteja desligada, o aplicativo mantém os dados de demonstração e mostra avisos apenas no console.

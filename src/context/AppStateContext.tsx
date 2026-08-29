@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState } from 'react';
-import { Meal, UserProfile, NutritionGoals, AppState, MealItem, MealType } from '../types';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Meal, UserProfile, NutritionGoals, AppState } from '../types';
+import { caloriqApi } from '../services/api';
 
 interface AppContextProps {
   state: AppState;
@@ -75,6 +76,17 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [meals, setMeals] = useState<Meal[]>(initialMeals);
   const [waterIntake, setWaterIntake] = useState<number>(1400);
 
+  useEffect(() => {
+    caloriqApi.getState()
+      .then((serverState) => {
+        setProfile(serverState.profile);
+        setGoals(serverState.goals);
+        setMeals(serverState.meals);
+        setWaterIntake(serverState.waterIntake);
+      })
+      .catch((error) => console.warn('API local indisponível; usando dados de demonstração.', error));
+  }, []);
+
   const addMeal = (newMealData: Omit<Meal, 'id' | 'time'>): Meal => {
     const now = new Date();
     const timeString = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -84,6 +96,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       time: timeString,
     };
     setMeals((prevMeals) => [newMeal, ...prevMeals]);
+    void caloriqApi.createMeal(newMeal).catch((error) => console.warn('Não foi possível salvar a refeição no PostgreSQL.', error));
     return newMeal;
   };
 
@@ -91,22 +104,27 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setMeals((prevMeals) =>
       prevMeals.map((meal) => (meal.id === updatedMeal.id ? updatedMeal : meal))
     );
+    void caloriqApi.updateMeal(updatedMeal).catch((error) => console.warn('Não foi possível atualizar a refeição no PostgreSQL.', error));
   };
 
   const deleteMeal = (mealId: string) => {
     setMeals((prevMeals) => prevMeals.filter((meal) => meal.id !== mealId));
+    void caloriqApi.deleteMeal(mealId).catch((error) => console.warn('Não foi possível excluir a refeição no PostgreSQL.', error));
   };
 
   const addWater = (amount: number) => {
     setWaterIntake((prev) => Math.max(0, prev + amount));
+    void caloriqApi.addWater(amount).catch((error) => console.warn('Não foi possível registrar a água no PostgreSQL.', error));
   };
 
   const updateGoals = (newGoals: Partial<NutritionGoals>) => {
     setGoals((prev) => ({ ...prev, ...newGoals }));
+    void caloriqApi.updateGoals(newGoals).catch((error) => console.warn('Não foi possível atualizar as metas no PostgreSQL.', error));
   };
 
   const updateProfile = (newProfile: Partial<UserProfile>) => {
     setProfile((prev) => ({ ...prev, ...newProfile }));
+    void caloriqApi.updateProfile(newProfile).catch((error) => console.warn('Não foi possível atualizar o perfil no PostgreSQL.', error));
   };
 
   // Mock de escaneamento de alimentos com inteligência artificial
