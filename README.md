@@ -1,6 +1,6 @@
 # CaloriQ 3.0 — Protótipo Premium com IA Real 🥗📸
 
-Bem-vindo ao **CaloriQ 3.0**, um aplicativo de controle nutricional inteligente e acompanhamento diário de calorias desenvolvido com **React Native**, **Expo** e integrado diretamente com o **Google Gemini API (Gemini 2.5 Flash)**.
+Bem-vindo ao **CaloriQ 3.0**, um aplicativo de controle nutricional inteligente e acompanhamento diário de calorias desenvolvido com **React Native**, **Expo** e integrado diretamente com o **Google Gemini API (Gemini 3.6 Flash)**.
 
 Esta versão traz a experiência completa com captura real por câmera, webcam no computador, importação de arquivos de imagem e processamento nutricional instantâneo usando visão computacional.
 
@@ -13,7 +13,7 @@ Tire uma foto ou faça o upload de uma imagem do seu prato para que a IA analise
 *   **Câmera Celular:** Integração nativa para abrir a câmera física do aparelho (via **Expo Go** ou Builds).
 *   **Webcam no Computador:** Acessa e exibe a webcam do seu PC ao vivo no navegador com efeito espelhado, corners inteligentes e linha laser animada de escaneamento.
 *   **Galeria / Arquivo:** Envio de imagens da galeria de fotos do dispositivo (ou seletor de arquivos local no PC).
-*   **Análise Real com Gemini:** Envia a imagem para o modelo `gemini-2.5-flash` que identifica os ingredientes, estima as porções (gramas, colheres), calcula calorias individuais/macros e gera um insight nutricional para a refeição.
+*   **Análise Real com Gemini:** Envia a imagem para o modelo `gemini-3.6-flash` que identifica os ingredientes, estima as porções (gramas, colheres), calcula calorias individuais/macros e gera um insight nutricional para a refeição.
 
 ### 2. 🤖 Assistente Nutricional (Chat IA)
 Um chat completo com inteligência artificial real:
@@ -38,7 +38,7 @@ Antes de salvar a refeição no diário, a tela de ajuste permite que você edit
 *   **Estilização:** Vanilla CSS embutido com StyleSheet
 *   **Imagens:** `expo-image` (Carregamento rápido de alta performance)
 *   **Seleção de Mídia:** `expo-image-picker`
-*   **IA de Análise & Chat:** Google Gemini API (`gemini-2.5-flash` via requisições diretas de HTTP)
+*   **IA de Análise & Chat:** Google Gemini API (`gemini-3.6-flash` via requisições diretas de HTTP)
 *   **Ícones:** `@expo/vector-icons` (Ionicons)
 
 ---
@@ -72,7 +72,7 @@ Crie um arquivo `.env` na raiz (use `.env.example` como modelo):
 
 ```env
 EXPO_PUBLIC_GEMINI_API_KEY=sua_chave_do_google_ai_studio
-EXPO_PUBLIC_GEMINI_MODEL=gemini-2.5-flash
+EXPO_PUBLIC_GEMINI_MODEL=gemini-3.6-flash
 ```
 
 Reinicie o Expo depois da alteração. Em erros temporários, o scanner tenta novamente uma vez; se a cota continuar indisponível, permite continuar claramente em modo de demonstração com dados locais.

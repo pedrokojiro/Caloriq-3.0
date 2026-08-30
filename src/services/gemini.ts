@@ -1,5 +1,5 @@
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY?.trim() || '';
-const GEMINI_MODEL = process.env.EXPO_PUBLIC_GEMINI_MODEL?.trim() || 'gemini-2.5-flash';
+const GEMINI_MODEL = process.env.EXPO_PUBLIC_GEMINI_MODEL?.trim() || 'gemini-3.6-flash';
 const API_TIMEOUT_MS = 25_000;
 
 export type GeminiErrorCode = 'CONFIG' | 'QUOTA' | 'UNAVAILABLE' | 'TIMEOUT' | 'INVALID_RESPONSE' | 'UNKNOWN';
