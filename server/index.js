@@ -37,6 +37,28 @@ app.get('/health', async (_request, response, next) => {
   } catch (error) { next(error); }
 });
 
+app.get('/api/diagnostics/database', async (_request, response) => {
+  response.set('Cache-Control', 'no-store');
+  const started = Date.now();
+  try {
+    const result = await pool.query({
+      text: `SELECT current_database() AS name,
+        (SELECT COUNT(*)::int FROM meals WHERE user_id = $1) AS meals,
+        (SELECT COUNT(*)::int FROM meal_items i JOIN meals m ON m.id = i.meal_id WHERE m.user_id = $1) AS items,
+        (SELECT COUNT(*)::int FROM water_entries WHERE user_id = $1) AS water_entries`,
+      values: [userId],
+      query_timeout: 5000,
+    });
+    const row = result.rows[0];
+    response.json({ api: 'connected', database: 'connected', databaseName: row.name,
+      checkedAt: new Date().toISOString(), latencyMs: Date.now() - started,
+      counts: { meals: row.meals, items: row.items, waterEntries: row.water_entries } });
+  } catch {
+    response.json({ api: 'connected', database: 'unavailable', databaseName: null,
+      checkedAt: new Date().toISOString(), latencyMs: Date.now() - started, counts: null });
+  }
+});
+
 app.get('/api/state', async (_request, response, next) => {
   try {
     const [profileResult, goalsResult, mealsResult, itemsResult, waterResult] = await Promise.all([

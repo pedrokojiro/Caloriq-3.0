@@ -81,6 +81,14 @@ export default function ProfileScreen() {
         {/* Configurations List */}
         <Card style={styles.optionsListCard}>
           <OptionItem
+            icon="server-outline"
+            iconColor={globalColors.primary}
+            iconBg="#EDFBF3"
+            title="Diagnóstico do banco"
+            subtitle="Verifique a conexão e os registros salvos"
+            onPress={() => router.push('../sub-screens/database-diagnostics')}
+          />
+          <OptionItem
             icon="person-outline"
             iconColor={globalColors.primary}
             iconBg="#EDFBF3"
