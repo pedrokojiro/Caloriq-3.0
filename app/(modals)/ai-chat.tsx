@@ -13,6 +13,7 @@ interface Message {
   text: string;
   sender: 'bot' | 'user';
   time: string;
+  excludeFromHistory?: boolean;
 }
 
 export default function AIChatModal() {
@@ -20,6 +21,7 @@ export default function AIChatModal() {
   const { colors, globalColors } = useTheme();
   const { state } = useAppState();
   const scrollRef = useRef<ScrollView>(null);
+  const sending = useRef(false);
 
   const [inputVal, setInputVal] = useState('');
   const [messages, setMessages] = useState<Message[]>([
@@ -27,13 +29,15 @@ export default function AIChatModal() {
       id: '1',
       text: `Olá, ${state.profile.name}! Sou seu assistente nutricional CaloriQ. 🤖`,
       sender: 'bot',
-      time: '09:41',
+      time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      excludeFromHistory: true,
     },
     {
       id: '2',
-      text: 'Analisei seu diário de hoje e notei que você consumiu bastante proteína no almoço, mas ainda faltam cerca de 52g para atingir sua meta diária de 150g. Como posso te ajudar a bater esse alvo?',
+      text: 'Posso ajudar com estimativas de calorias e dúvidas sobre alimentos. O que você gostaria de saber?',
       sender: 'bot',
-      time: '09:41',
+      time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      excludeFromHistory: true,
     },
   ]);
   const [isTyping, setIsTyping] = useState(false);
@@ -46,7 +50,8 @@ export default function AIChatModal() {
   }, [messages, isTyping]);
 
   const handleSend = async () => {
-    if (!inputVal.trim()) return;
+    if (!inputVal.trim() || sending.current) return;
+    sending.current = true;
 
     const userText = inputVal.trim();
     const now = new Date();
@@ -65,7 +70,7 @@ export default function AIChatModal() {
 
     try {
       // Build history for Gemini
-      const geminiHistory = messages.map(msg => ({
+      const geminiHistory = messages.filter(msg => !msg.excludeFromHistory).map(msg => ({
         role: msg.sender === 'user' ? 'user' as const : 'model' as const,
         parts: [{ text: msg.text }]
       }));
@@ -87,6 +92,7 @@ export default function AIChatModal() {
       setIsTyping(false);
       const isCapacityError = err instanceof GeminiServiceError && ['QUOTA', 'UNAVAILABLE', 'TIMEOUT'].includes(err.code);
       const errorMsg: Message = {
+        excludeFromHistory: true,
         id: `msg-${Date.now() + 1}`,
         text: isCapacityError
           ? 'A IA está temporariamente ocupada ou atingiu o limite de uso. Aguarde um pouco e tente novamente; seu histórico foi preservado.'
@@ -95,6 +101,8 @@ export default function AIChatModal() {
         time: timeStr,
       };
       setMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      sending.current = false;
     }
   };
 
@@ -121,7 +129,7 @@ export default function AIChatModal() {
               <Text style={[styles.botName, { color: colors.textMain }]}>NutriCaloriQ IA</Text>
               <View style={styles.onlineRow}>
                 <View style={[styles.onlineDot, { backgroundColor: globalColors.primary }]} />
-                <Text style={[styles.onlineText, { color: colors.textLight }]}>Online</Text>
+                <Text style={[styles.onlineText, { color: colors.textLight }]}>Assistente nutricional</Text>
               </View>
             </View>
           </View>
@@ -199,6 +207,7 @@ export default function AIChatModal() {
           />
           <Pressable
             onPress={handleSend}
+            disabled={isTyping}
             style={[styles.sendBtn, { backgroundColor: globalColors.primary }]}
           >
             <Ionicons name="send" size={16} color="#FFFFFF" />
@@ -313,9 +322,11 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 14,
     lineHeight: 20,
-    flexShrink: 1,
+    flexShrink: 0,
   },
   messageTime: {
+    minWidth: 36,
+    flexShrink: 0,
     fontSize: 9,
     alignSelf: 'flex-end',
     marginTop: 6,

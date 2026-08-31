@@ -1,5 +1,7 @@
 # CaloriQ 3.0 — Protótipo Premium com IA Real 🥗📸
 
+Para apresentar em outro notebook sem editar IP e porta a cada rede, consulte [APRESENTACAO.md](APRESENTACAO.md). Após o preparo inicial, execute `npm run apresentar`.
+
 Bem-vindo ao **CaloriQ 3.0**, um aplicativo de controle nutricional inteligente e acompanhamento diário de calorias desenvolvido com **React Native**, **Expo** e integrado diretamente com o **Google Gemini API (Gemini 3.6 Flash)**.
 
 Esta versão traz a experiência completa com captura real por câmera, webcam no computador, importação de arquivos de imagem e processamento nutricional instantâneo usando visão computacional.

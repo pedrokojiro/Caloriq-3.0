@@ -144,4 +144,15 @@ app.use((error, _request, response, _next) => {
   response.status(500).json({ error: 'Erro interno da API local.' });
 });
 
-app.listen(port, () => console.log(`API Caloriq disponível em http://localhost:${port}`));
+const server = app.listen(port, '0.0.0.0', (error) => {
+  if (error) {
+    console.error(error.code === 'EADDRINUSE'
+      ? `A porta ${port} já está ocupada. Encerre a execução anterior da API/apresentar com Ctrl+C e tente novamente. Nenhuma porta alternativa será usada.`
+      : `Não foi possível abrir a API na porta ${port}. Confira as permissões de rede.`);
+    process.exit(1);
+    return;
+  }
+  const actualPort = server.address().port;
+  console.log(`API Caloriq disponível em http://localhost:${actualPort}`);
+  if (process.send) process.send({ type: 'ready', port: actualPort });
+});

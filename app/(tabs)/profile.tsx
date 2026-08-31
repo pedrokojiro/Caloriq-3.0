@@ -84,6 +84,14 @@ export default function ProfileScreen() {
             icon="server-outline"
             iconColor={globalColors.primary}
             iconBg="#EDFBF3"
+            title="Configuração da apresentação"
+            subtitle="Chave Gemini e conexão com o servidor"
+            onPress={() => router.push('../sub-screens/presentation-settings')}
+          />
+          <OptionItem
+            icon="server-outline"
+            iconColor={globalColors.primary}
+            iconBg="#EDFBF3"
             title="Diagnóstico do banco"
             subtitle="Verifique a conexão e os registros salvos"
             onPress={() => router.push('../sub-screens/database-diagnostics')}

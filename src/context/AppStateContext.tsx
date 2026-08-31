@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Meal, UserProfile, NutritionGoals, AppState } from '../types';
 import { caloriqApi } from '../services/api';
+import { subscribeSettings } from '../services/local-settings';
 
 interface AppContextProps {
   state: AppState;
@@ -75,17 +76,22 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [goals, setGoals] = useState<NutritionGoals>(initialGoals);
   const [meals, setMeals] = useState<Meal[]>(initialMeals);
   const [waterIntake, setWaterIntake] = useState<number>(1400);
+  const [settingsVersion, setSettingsVersion] = useState(0);
+  useEffect(() => subscribeSettings(() => setSettingsVersion(value => value + 1)), []);
 
   useEffect(() => {
+    let active = true;
     caloriqApi.getState()
       .then((serverState) => {
+        if (!active) return;
         setProfile(serverState.profile);
         setGoals(serverState.goals);
         setMeals(serverState.meals);
         setWaterIntake(serverState.waterIntake);
       })
       .catch((error) => console.warn('API local indisponível; usando dados de demonstração.', error));
-  }, []);
+    return () => { active = false; };
+  }, [settingsVersion]);
 
   const addMeal = (newMealData: Omit<Meal, 'id' | 'time'>): Meal => {
     const now = new Date();

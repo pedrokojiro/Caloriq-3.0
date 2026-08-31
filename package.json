@@ -5,6 +5,7 @@
   "dependencies": {
     "@expo/ui": "~56.0.18",
     "@expo/vector-icons": "^15.0.2",
+    "@react-native-async-storage/async-storage": "^2.2.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "expo": "~56.0.12",
@@ -53,7 +54,10 @@
     "lint": "expo lint",
     "api": "node server/index.js",
     "api:dev": "node --watch server/index.js",
-    "db:migrate": "node server/migrate.js"
+    "db:migrate": "node server/migrate.js",
+    "db:setup": "node scripts/setup-local-db.js",
+    "apresentar": "node scripts/present.js",
+    "configurar": "node scripts/configure-local.js"
   },
   "private": true
 }
