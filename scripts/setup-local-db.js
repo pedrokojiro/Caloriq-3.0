@@ -23,13 +23,8 @@ async function setup() {
   const client = new Client({ connectionString: url.toString(), connectionTimeoutMillis: 5000 });
   try {
     await client.connect();
-    const existing = await client.query("SELECT to_regclass('public.users') AS table_name");
-    if (!existing.rows[0].table_name) {
-      await client.query(await fs.readFile(path.join(__dirname, '../server/schema.sql'), 'utf8'));
-      console.log('Banco e tabelas criados com os exemplos iniciais.');
-    } else {
-      console.log('Banco já preparado. Dados existentes preservados; exemplos não foram recriados.');
-    }
+    await client.query(await fs.readFile(path.join(__dirname, '../server/schema.sql'), 'utf8'));
+    console.log('Estrutura do banco atualizada. Dados existentes foram preservados.');
   } finally { await client.end(); }
 }
 

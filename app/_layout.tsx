@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider } from '../src/context/ThemeContext';
 import { AppStateProvider } from '../src/context/AppStateContext';
+import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import * as SplashScreen from 'expo-splash-screen';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -17,7 +18,8 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <AppStateProvider>
+        <AuthProvider>
+          <AuthenticatedState>
           <Stack
             screenOptions={{
               headerShown: false,
@@ -27,6 +29,7 @@ export default function RootLayout() {
             {/* Auth screens */}
             <Stack.Screen name="(auth)/onboarding" />
             <Stack.Screen name="(auth)/login" />
+            <Stack.Screen name="(auth)/register" />
             
             {/* Tabs structure */}
             <Stack.Screen name="(tabs)" />
@@ -60,8 +63,14 @@ export default function RootLayout() {
             <Stack.Screen name="sub-screens/devices" />
             <Stack.Screen name="sub-screens/notifications" />
           </Stack>
-        </AppStateProvider>
+          </AuthenticatedState>
+        </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );
+}
+
+function AuthenticatedState({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  return <AppStateProvider key={user?.id || 'guest'}>{children}</AppStateProvider>;
 }

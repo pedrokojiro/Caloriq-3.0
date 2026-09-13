@@ -1,10 +1,10 @@
-import { readSettings } from './local-settings';
 import { readGeminiText, plainChatText } from './gemini-response';
+import { getApiUrl } from './api';
+import { readAuthToken } from './auth-storage';
 function responseText(data: Parameters<typeof readGeminiText>[0], context: 'chat' | 'image' = 'chat') {
   try { return readGeminiText(data, context); }
   catch (error) { throw new GeminiServiceError('INVALID_RESPONSE', error instanceof Error ? error.message : 'Resposta inválida.'); }
 }
-const GEMINI_MODEL = process.env.EXPO_PUBLIC_GEMINI_MODEL?.trim() || 'gemini-3.6-flash';
 const API_TIMEOUT_MS = 25_000;
 
 export type GeminiErrorCode = 'CONFIG' | 'QUOTA' | 'UNAVAILABLE' | 'TIMEOUT' | 'INVALID_RESPONSE' | 'UNKNOWN';
@@ -31,30 +31,31 @@ const uriToBase64 = async (uri: string): Promise<string> => {
 const wait = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds));
 
 const requestGemini = async (body: unknown, retries = 1, timeoutMs = API_TIMEOUT_MS): Promise<any> => {
-  const GEMINI_API_KEY = (await readSettings()).geminiKey || process.env.EXPO_PUBLIC_GEMINI_API_KEY?.trim() || '';
-  if (!GEMINI_API_KEY) throw new GeminiServiceError('CONFIG', 'Configure EXPO_PUBLIC_GEMINI_API_KEY antes de usar a IA.');
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
+  const token = await readAuthToken();
+  if (!token) throw new GeminiServiceError('CONFIG', 'Faça login para usar a IA.');
+  const url = `${await getApiUrl()}/api/ai/generate`;
 
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await fetch(url, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal,
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body), signal: controller.signal,
       });
       if (response.ok) return await response.json();
 
       const status = response.status;
-      const retryable = status === 429 || [500, 502, 503, 504].includes(status);
+      const payload = await response.json().catch(() => null) as { error?: string; code?: GeminiErrorCode } | null;
+      const retryable = [500, 502, 503, 504].includes(status) && payload?.code !== 'CONFIG';
       if (retryable && attempt < retries) {
         const retryAfter = Number(response.headers.get('retry-after'));
         await wait(Number.isFinite(retryAfter) ? Math.min(retryAfter * 1000, 4_000) : 1_200 * (attempt + 1));
         continue;
       }
-      if (status === 429) throw new GeminiServiceError('QUOTA', 'A cota da IA foi atingida ou há requisições demais.', status);
-      if (retryable) throw new GeminiServiceError('UNAVAILABLE', 'O serviço de IA está temporariamente indisponível.', status);
-      if ([400, 401, 403].includes(status)) throw new GeminiServiceError('CONFIG', 'A chave ou a configuração da IA foi recusada.', status);
-      throw new GeminiServiceError('UNKNOWN', `A IA respondeu com o status ${status}.`, status);
+      if (status === 429 || payload?.code === 'QUOTA') throw new GeminiServiceError('QUOTA', payload?.error || 'A cota da IA foi atingida ou há requisições demais.', status);
+      if (retryable) throw new GeminiServiceError(payload?.code || 'UNAVAILABLE', payload?.error || 'O serviço de IA está temporariamente indisponível.', status);
+      if ([400, 401, 403].includes(status) || payload?.code === 'CONFIG') throw new GeminiServiceError('CONFIG', payload?.error || 'A configuração da IA foi recusada.', status);
+      throw new GeminiServiceError(payload?.code || 'UNKNOWN', payload?.error || `A IA respondeu com o status ${status}.`, status);
     } catch (error) {
       if (error instanceof GeminiServiceError) throw error;
       if (error instanceof Error && error.name === 'AbortError') throw new GeminiServiceError('TIMEOUT', 'A análise demorou mais que o esperado.');

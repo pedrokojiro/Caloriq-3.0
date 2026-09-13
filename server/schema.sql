@@ -10,6 +10,19 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(254);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_idx ON users (LOWER(email)) WHERE email IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS auth_sessions (
+  token_hash CHAR(64) PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS auth_sessions_user_idx ON auth_sessions(user_id);
+CREATE INDEX IF NOT EXISTS auth_sessions_expiry_idx ON auth_sessions(expires_at);
+
 CREATE TABLE IF NOT EXISTS nutrition_goals (
   user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   calories INTEGER NOT NULL CHECK (calories > 0),

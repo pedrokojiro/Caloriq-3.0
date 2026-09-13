@@ -10,7 +10,6 @@ import { GeminiServiceError, testGeminiConnection } from '../../src/services/gem
 export default function PresentationSettings() {
   const router = useRouter();
   const { colors, globalColors } = useTheme();
-  const [key, setKey] = useState('');
   const [url, setUrl] = useState('');
   const [effectiveUrl, setEffectiveUrl] = useState('');
   const [busy, setBusy] = useState(true);
@@ -20,7 +19,7 @@ export default function PresentationSettings() {
     let active = true;
     Promise.all([readSettings(), getApiUrl()]).then(([settings, address]) => {
       if (!active) return;
-      setKey(settings.geminiKey); setUrl(settings.apiUrl); setEffectiveUrl(address);
+      setUrl(settings.apiUrl); setEffectiveUrl(address);
       setReady(true); setMessage('');
     }).catch(() => { if (active) setMessage('Não foi possível ler as configurações. Reabra esta tela.'); })
       .finally(() => { if (active) setBusy(false); });
@@ -31,8 +30,8 @@ export default function PresentationSettings() {
     if (busy || !ready) return;
     setBusy(true); setMessage('Aguarde…');
     try {
-      await saveSettings({ geminiKey: action === 'reset' ? '' : key, apiUrl: action === 'reset' ? '' : url });
-      if (action === 'reset') { setKey(''); setUrl(''); }
+      await saveSettings({ apiUrl: action === 'reset' ? '' : url });
+      if (action === 'reset') setUrl('');
       setEffectiveUrl(await getApiUrl());
       if (action === 'gemini') {
         await testGeminiConnection();
@@ -62,18 +61,16 @@ export default function PresentationSettings() {
           <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.back}><Text style={{ color: globalColors.primary }}>← Voltar ao perfil</Text></Pressable>
           <Text style={[styles.title, { color: colors.textMain }]}>Configuração da apresentação</Text>
           <Card>
-            <Text style={[styles.label, { color: colors.textMain }]}>Chave da API Gemini (visível)</Text>
-            <Text style={{ color: colors.textMuted }}>Cole a chave abaixo. Ela fica salva neste aparelho/navegador, sem criptografia. Não mostre esta tela no projetor nem compartilhe prints.</Text>
-            <TextInput accessibilityLabel="Chave da API Gemini visível" value={key} onChangeText={setKey} editable={!busy && ready} secureTextEntry={false} autoCapitalize="none" autoCorrect={false} style={inputStyle} placeholder="Cole sua chave aqui" placeholderTextColor={colors.textMuted} />
-            <Text style={{ color: colors.textMuted }}>Se deixar vazio, será usada a chave do .env, se existir. O teste consome cota e não garante disponibilidade futura.</Text>
-            {button('Salvar e testar Gemini', 'gemini')}
+            <Text style={[styles.label, { color: colors.textMain }]}>Inteligência artificial protegida</Text>
+            <Text style={{ color: colors.textMuted }}>A chave do Gemini fica somente no servidor e não aparece no aplicativo nem no APK. O teste consome cota e não garante disponibilidade futura.</Text>
+            {button('Testar Gemini pelo servidor', 'gemini')}
           </Card>
           <Card>
             <Text style={[styles.label, { color: colors.textMain }]}>Endereço do backend (opcional)</Text>
-            <Text style={{ color: colors.textMuted }}>Deixe vazio para usar o endereço do iniciador. Se necessário, informe o IPv4 e a porta da API — não a porta do PostgreSQL.</Text>
+            <Text style={{ color: colors.textMuted }}>Deixe vazio para usar o servidor configurado no aplicativo. Durante o desenvolvimento, você ainda pode informar um endereço local.</Text>
             <TextInput accessibilityLabel="Endereço do backend" value={url} onChangeText={setUrl} editable={!busy && ready} autoCapitalize="none" autoCorrect={false} keyboardType="url" style={inputStyle} placeholder="http://192.168.1.10:3333" placeholderTextColor={colors.textMuted} />
             <Text selectable style={{ color: colors.textMuted }}>Endereço salvo em uso: {effectiveUrl || '—'}</Text>
-            <Text style={{ color: colors.textMuted }}>A senha do banco continua somente no notebook. Esta tela não instala nem inicia o servidor.</Text>
+            <Text style={{ color: colors.textMuted }}>Na versão publicada, o PostgreSQL e suas credenciais também ficam somente na nuvem.</Text>
             {button('Salvar e testar banco', 'database')}
           </Card>
           {button('Salvar sem testar', 'save')}

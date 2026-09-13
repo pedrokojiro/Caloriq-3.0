@@ -28,7 +28,7 @@ async function configure() {
   let source = fs.existsSync(filename) ? fs.readFileSync(filename, 'utf8') : '';
   const current = dotenv.parse(source);
   const force = process.argv.includes('--editar');
-  const needsKey = force || !current.EXPO_PUBLIC_GEMINI_API_KEY || /sua_chave|COLE_SUA|SUA_API/i.test(current.EXPO_PUBLIC_GEMINI_API_KEY);
+  const needsKey = force || !current.GEMINI_API_KEY || /sua_chave|COLE_SUA|SUA_API/i.test(current.GEMINI_API_KEY);
   const needsDatabase = force || !current.DATABASE_URL || /troque_esta_senha/.test(current.DATABASE_URL);
   if ((needsKey || needsDatabase) && !process.stdin.isTTY) throw new Error('Abra o configurador em um terminal interativo.');
   let muted = false;
@@ -46,9 +46,9 @@ async function configure() {
   }
   try {
     if (needsKey) {
-      const key = (await secret('Chave Gemini do AI Studio — Enter para configurar depois na tela do app')).trim();
+      const key = (await secret('Chave Gemini do AI Studio')).trim();
       if (key && !/^[A-Za-z0-9_.-]{20,}$/.test(key)) throw new Error('Formato inválido.');
-      source = replaceSetting(source, 'EXPO_PUBLIC_GEMINI_API_KEY', key);
+      source = replaceSetting(source, 'GEMINI_API_KEY', key);
     }
     if (needsDatabase) {
       console.log('Informe os dados do PostgreSQL instalado NESTE notebook.');
@@ -59,7 +59,7 @@ async function configure() {
       if (!password) throw new Error('Senha vazia.');
       source = replaceSetting(source, 'DATABASE_URL', connectionUrl(user, password, port, database));
     }
-    if (!current.EXPO_PUBLIC_GEMINI_MODEL) source = replaceSetting(source, 'EXPO_PUBLIC_GEMINI_MODEL', 'gemini-3.6-flash');
+    if (!current.GEMINI_MODEL) source = replaceSetting(source, 'GEMINI_MODEL', 'gemini-3.6-flash');
     if (!current.EXPO_PUBLIC_AI_DEMO_MODE) source = replaceSetting(source, 'EXPO_PUBLIC_AI_DEMO_MODE', 'false');
     if (!current.EXPO_PUBLIC_API_URL) source = replaceSetting(source, 'EXPO_PUBLIC_API_URL', 'auto');
     if (source !== (fs.existsSync(filename) ? fs.readFileSync(filename, 'utf8') : '')) {

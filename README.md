@@ -1,6 +1,6 @@
 # CaloriQ 3.0 — Protótipo Premium com IA Real 🥗📸
 
-Para apresentar em outro notebook sem editar IP e porta a cada rede, consulte [APRESENTACAO.md](APRESENTACAO.md). Após o preparo inicial, execute `npm run apresentar`.
+Para usar o backend e o banco na nuvem e gerar um APK, consulte [NUVEM_E_APK.md](NUVEM_E_APK.md). O caminho local antigo continua documentado em [APRESENTACAO.md](APRESENTACAO.md).
 
 Bem-vindo ao **CaloriQ 3.0**, um aplicativo de controle nutricional inteligente e acompanhamento diário de calorias desenvolvido com **React Native**, **Expo** e integrado diretamente com o **Google Gemini API (Gemini 3.6 Flash)**.
 
@@ -40,7 +40,7 @@ Antes de salvar a refeição no diário, a tela de ajuste permite que você edit
 *   **Estilização:** Vanilla CSS embutido com StyleSheet
 *   **Imagens:** `expo-image` (Carregamento rápido de alta performance)
 *   **Seleção de Mídia:** `expo-image-picker`
-*   **IA de Análise & Chat:** Google Gemini API (`gemini-3.6-flash` via requisições diretas de HTTP)
+*   **IA de Análise & Chat:** Google Gemini API (`gemini-3.6-flash` por meio do backend protegido)
 *   **Ícones:** `@expo/vector-icons` (Ionicons)
 
 ---
@@ -73,13 +73,13 @@ Antes de salvar a refeição no diário, a tela de ajuste permite que você edit
 Crie um arquivo `.env` na raiz (use `.env.example` como modelo):
 
 ```env
-EXPO_PUBLIC_GEMINI_API_KEY=sua_chave_do_google_ai_studio
-EXPO_PUBLIC_GEMINI_MODEL=gemini-3.6-flash
+GEMINI_API_KEY=sua_chave_do_google_ai_studio
+GEMINI_MODEL=gemini-3.6-flash
 ```
 
 Reinicie o Expo depois da alteração. Em erros temporários, o scanner tenta novamente uma vez; se a cota continuar indisponível, permite continuar claramente em modo de demonstração com dados locais.
 
-> Em uma versão publicada, `EXPO_PUBLIC_*` não é segredo. Mova a chamada do Gemini para um backend/proxy. Esta configuração serve para desenvolvimento e apresentação controlada.
+> A chave é lida somente pelo backend. Não use o prefixo `EXPO_PUBLIC_` em segredos: esse prefixo inclui o valor no aplicativo.
 
 ## 🐘 Banco de dados PostgreSQL local
 

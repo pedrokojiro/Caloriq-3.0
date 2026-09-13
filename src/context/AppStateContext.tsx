@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Meal, UserProfile, NutritionGoals, AppState } from '../types';
 import { caloriqApi } from '../services/api';
 import { subscribeSettings } from '../services/local-settings';
+import { useAuth } from './AuthContext';
 
 interface AppContextProps {
   state: AppState;
@@ -15,10 +16,10 @@ interface AppContextProps {
 }
 
 const initialProfile: UserProfile = {
-  name: 'Pedro',
-  streak: 12,
-  weight: 78,
-  avatarText: 'P',
+  name: 'Usuário',
+  streak: 0,
+  weight: 70,
+  avatarText: 'U',
 };
 
 const initialGoals: NutritionGoals = {
@@ -29,57 +30,19 @@ const initialGoals: NutritionGoals = {
   water: 2500,
 };
 
-const initialMeals: Meal[] = [
-  {
-    id: 'meal-1',
-    name: 'Panqueca de Aveia e Whey',
-    type: 'Café da manhã',
-    calories: 410,
-    protein: 30,
-    carbs: 45,
-    fat: 10,
-    portions: 1,
-    emoji: '🥞',
-    time: '08:15',
-    confidence: 96,
-    items: [
-      { id: 'item-1', name: 'Whey Protein', calories: 120, protein: 24, carbs: 3, fat: 1, amount: '30g' },
-      { id: 'item-2', name: 'Farinha de Aveia', calories: 190, protein: 6, carbs: 32, fat: 4, amount: '50g' },
-      { id: 'item-3', name: 'Banana Prata', calories: 100, protein: 1, carbs: 25, fat: 0, amount: '1 unidade' },
-    ],
-  },
-  {
-    id: 'meal-2',
-    name: 'Salada com Frango Grelhado',
-    type: 'Almoço',
-    calories: 480,
-    protein: 42,
-    carbs: 18,
-    fat: 12,
-    portions: 1.2,
-    emoji: '🥗',
-    time: '12:30',
-    confidence: 94,
-    items: [
-      { id: 'item-4', name: 'Peito de Frango Grelhado', calories: 220, protein: 35, carbs: 0, fat: 8, amount: '150g' },
-      { id: 'item-5', name: 'Mix de Folhas Verdes', calories: 20, protein: 1, carbs: 4, fat: 0, amount: '100g' },
-      { id: 'item-6', name: 'Azeite de Oliva Extra Virgem', calories: 140, protein: 0, carbs: 0, fat: 15, amount: '1 colher de sopa' },
-      { id: 'item-7', name: 'Cenoura Ralada', calories: 20, protein: 0.5, carbs: 5, fat: 0, amount: '50g' },
-    ],
-  },
-];
-
 const AppStateContext = createContext<AppContextProps | undefined>(undefined);
 
 export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
   const [profile, setProfile] = useState<UserProfile>(initialProfile);
   const [goals, setGoals] = useState<NutritionGoals>(initialGoals);
-  const [meals, setMeals] = useState<Meal[]>(initialMeals);
-  const [waterIntake, setWaterIntake] = useState<number>(1400);
+  const [meals, setMeals] = useState<Meal[]>([]);
+  const [waterIntake, setWaterIntake] = useState<number>(0);
   const [settingsVersion, setSettingsVersion] = useState(0);
   useEffect(() => subscribeSettings(() => setSettingsVersion(value => value + 1)), []);
 
   useEffect(() => {
+    if (!user) return;
     let active = true;
     caloriqApi.getState()
       .then((serverState) => {
@@ -89,9 +52,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setMeals(serverState.meals);
         setWaterIntake(serverState.waterIntake);
       })
-      .catch((error) => console.warn('API local indisponível; usando dados de demonstração.', error));
+      .catch((error) => console.warn('API local indisponível; os dados da conta não puderam ser carregados.', error));
     return () => { active = false; };
-  }, [settingsVersion]);
+  }, [settingsVersion, user]);
 
   const addMeal = (newMealData: Omit<Meal, 'id' | 'time'>): Meal => {
     const now = new Date();

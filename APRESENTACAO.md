@@ -1,12 +1,14 @@
 # Apresentar em outro notebook
 
+> Para o APK com servidor e banco na nuvem, use [NUVEM_E_APK.md](NUVEM_E_APK.md). Este arquivo descreve apenas o modo local antigo.
+
 ## Configuração pela tela do aplicativo
 
-Em **Perfil → Configuração da apresentação**, cole a chave Gemini no campo visível e salve. O chat e a análise de fotos passam a usar essa chave sem reiniciar. O teste real consome cota. No iniciador, você pode pressionar Enter no pedido da chave e configurá-la depois nesta tela.
+Em **Perfil → Configuração da apresentação**, teste a conexão com o Gemini por meio do backend e, se necessário, ajuste o endereço local da API. A chave Gemini permanece somente no servidor e não é armazenada no aplicativo.
 
 O endereço do backend pode ser deixado vazio para usar o iniciador, ou substituído por `http://IPv4:porta`. Salvar recarrega os dados do servidor. O teste do banco consulta API e PostgreSQL de verdade; não inicia os serviços. A senha PostgreSQL continua no notebook.
 
-Os valores são salvos somente neste aparelho/navegador, sem criptografia, não no código nem no GitHub. Não projete esta tela com a chave preenchida. Remover as configurações locais volta aos valores do iniciador/.env (não revoga a chave no Google). Um endereço manual salvo tem prioridade sobre a detecção automática; remova-o ao trocar de notebook.
+O endereço manual é salvo somente neste aparelho/navegador. Remover a configuração local volta ao valor do iniciador/.env. Um endereço manual salvo tem prioridade sobre a detecção automática; remova-o ao trocar de notebook.
 
 ## Caminho mais simples no Windows
 
@@ -14,7 +16,7 @@ Com Node.js 22+ e PostgreSQL já instalados, abra **APRESENTAR.cmd** com dois cl
 
 - Instala dependências na primeira execução e quando o package-lock mudar.
 - Pede chave Gemini, usuário/porta do PostgreSQL e senha apenas se ainda não estiverem configurados. A chave e a senha ficam ocultas durante a digitação.
-- Salva as configurações em `.env`, ignorado pelo Git. Não coloque esse arquivo em prints, chats ou no repositório. Isso não transforma a chave EXPO_PUBLIC em segredo do aplicativo: ela ainda é incluída no bundle do Expo.
+- Salva as configurações em `.env`, ignorado pelo Git. Não coloque esse arquivo em prints, chats ou no repositório. A chave `GEMINI_API_KEY` é usada somente pelo backend.
 - Prepara o banco, verifica a conexão e inicia API na porta fixa 3333 e Expo com endereço automático.
 - Nas próximas vezes, basta abrir o mesmo arquivo. Mantenha a janela aberta durante a apresentação.
 

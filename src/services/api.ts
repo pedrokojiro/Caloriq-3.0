@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { readSettings } from './local-settings';
+import { readAuthToken } from './auth-storage';
 import type { AppState, Meal, NutritionGoals, UserProfile } from '../types';
 
 const fallbackHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
@@ -26,16 +27,24 @@ export interface DatabaseDiagnostics {
 }
 
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
+  const token = await readAuthToken();
   const response = await fetch(`${await getApiUrl()}${path}`, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init?.headers },
   });
-  if (!response.ok) throw new Error(`API local respondeu com status ${response.status}.`);
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(body?.error || `API local respondeu com status ${response.status}.`);
+  }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 };
 
 export const caloriqApi = {
+  register: (data: { name: string; email: string; password: string; weight: number }) => request<AuthResponse>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+  login: (email: string, password: string) => request<AuthResponse>('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  getCurrentUser: () => request<{ user: AuthUser }>('/api/auth/me'),
+  logout: () => request<void>('/api/auth/logout', { method: 'POST' }),
   getDatabaseDiagnostics: (signal: AbortSignal) => request<DatabaseDiagnostics>('/api/diagnostics/database', { signal, cache: 'no-store' }),
   getState: () => request<AppState>('/api/state'),
   updateProfile: (profile: Partial<UserProfile>) => request('/api/profile', { method: 'PUT', body: JSON.stringify(profile) }),
@@ -45,3 +54,6 @@ export const caloriqApi = {
   deleteMeal: (mealId: string) => request(`/api/meals/${encodeURIComponent(mealId)}`, { method: 'DELETE' }),
   addWater: (amount: number) => request('/api/water', { method: 'POST', body: JSON.stringify({ amount }) }),
 };
+
+export interface AuthUser { id: string; name: string; email: string }
+export interface AuthResponse { token: string; user: AuthUser }

@@ -34,7 +34,7 @@ async function start() {
     return;
   } finally { await db.end(); }
   if (stopping) return;
-  if (!process.env.EXPO_PUBLIC_GEMINI_API_KEY) console.log('Aviso: chave Gemini ausente. A análise real não funcionará.');
+  if (!process.env.GEMINI_API_KEY && !process.env.EXPO_PUBLIC_GEMINI_API_KEY) console.log('Aviso: chave Gemini ausente no servidor. A análise real não funcionará.');
   api = fork(path.join(root, 'server/index.js'), [], {
     // Stable across restarts: cached Expo bundles must not point to a retired random port.
     cwd: root, env: { ...process.env, API_PORT: '3333' },

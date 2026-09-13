@@ -13,7 +13,7 @@ export default function OnboardingScreen() {
   const { colors, globalColors } = useTheme();
 
   const handleStart = () => {
-    router.push('/(auth)/login');
+    router.push('/(auth)/register' as never);
   };
 
   return (
@@ -109,7 +109,7 @@ export default function OnboardingScreen() {
         />
         <Button 
           title="Já tenho uma conta" 
-          onPress={handleStart}
+          onPress={() => router.push('/(auth)/login')}
           variant="ghost"
         />
       </View>

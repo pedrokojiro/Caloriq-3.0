@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, TextInput, View, ViewStyle, TextStyle, Pressable, KeyboardTypeOptions, StyleProp } from 'react-native';
+import React from 'react';
+import { StyleSheet, Text, TextInput, View, ViewStyle, TextStyle, Pressable, KeyboardTypeOptions, StyleProp, TextInputProps } from 'react-native';
 import { useTheme } from '../hooks/useTheme';
 
 interface InputProps {
@@ -16,6 +16,11 @@ interface InputProps {
   focused?: boolean;
   onFocus?: () => void;
   onBlur?: () => void;
+  autoCapitalize?: TextInputProps['autoCapitalize'];
+  autoCorrect?: boolean;
+  autoComplete?: TextInputProps['autoComplete'];
+  textContentType?: TextInputProps['textContentType'];
+  importantForAutofill?: TextInputProps['importantForAutofill'];
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -32,10 +37,14 @@ export const Input: React.FC<InputProps> = ({
   focused,
   onFocus,
   onBlur,
+  autoCapitalize,
+  autoCorrect,
+  autoComplete,
+  textContentType,
+  importantForAutofill,
 }) => {
   const { colors, globalColors } = useTheme();
-  const [internalFocus, setInternalFocus] = useState(false);
-  const isFocused = focused ?? internalFocus;
+  const isFocused = focused ?? false;
 
   return (
     <View style={[styles.container, style]}>
@@ -65,12 +74,15 @@ export const Input: React.FC<InputProps> = ({
           placeholderTextColor={colors.textLight}
           secureTextEntry={secureTextEntry}
           keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          autoCorrect={autoCorrect}
+          autoComplete={autoComplete}
+          textContentType={textContentType}
+          importantForAutofill={importantForAutofill}
           onFocus={() => {
-            setInternalFocus(true);
             onFocus?.();
           }}
           onBlur={() => {
-            setInternalFocus(false);
             onBlur?.();
           }}
           style={[styles.input, { color: colors.textMain }, inputStyle]}

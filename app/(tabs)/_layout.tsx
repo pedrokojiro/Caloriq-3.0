@@ -1,14 +1,18 @@
 import React from 'react';
-import { Tabs } from 'expo-router';
-import { StyleSheet, Text, View, Pressable, Platform } from 'react-native';
+import { Redirect, Tabs } from 'expo-router';
+import { ActivityIndicator, StyleSheet, Text, View, Pressable, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAuth } from '../../src/context/AuthContext';
 
 export default function TabLayout() {
+  const { user, loading } = useAuth();
   const { colors, globalColors } = useTheme();
   const insets = useSafeAreaInsets();
+  if (loading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator /></View>;
+  if (!user) return <Redirect href="/(auth)/login" />;
 
   return (
     <Tabs

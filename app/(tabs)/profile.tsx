@@ -6,16 +6,18 @@ import { useAppState } from '../../src/hooks/useAppState';
 import { BaseScreen, Card } from '../../src/components';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAuth } from '../../src/context/AuthContext';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { colors, globalColors, toggleTheme, theme, isDark } = useTheme();
   const { state } = useAppState();
   const { profile } = state;
+  const { user, logout } = useAuth();
 
-  const handleLogout = () => {
-    // Navigate back to onboarding
-    router.replace('/(auth)/onboarding');
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/(auth)/login');
   };
 
   const OptionItem = ({ 
@@ -73,6 +75,7 @@ export default function ProfileScreen() {
             <Text style={styles.avatarText}>{profile.avatarText}</Text>
           </LinearGradient>
           <Text style={[styles.profileName, { color: colors.textMain }]}>{profile.name}</Text>
+          {user?.email ? <Text style={[styles.profileWeight, { color: colors.textMuted }]}>{user.email}</Text> : null}
           <Text style={[styles.profileWeight, { color: colors.textMuted }]}>
             {profile.weight} kg · {profile.streak} dias de foco 🔥
           </Text>
@@ -85,7 +88,7 @@ export default function ProfileScreen() {
             iconColor={globalColors.primary}
             iconBg="#EDFBF3"
             title="Configuração da apresentação"
-            subtitle="Chave Gemini e conexão com o servidor"
+            subtitle="Conexão com o servidor e testes"
             onPress={() => router.push('../sub-screens/presentation-settings')}
           />
           <OptionItem
