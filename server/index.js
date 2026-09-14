@@ -7,7 +7,7 @@ const { normalizeEmail, validEmail, hashPassword, verifyPassword, createSessionT
 const { GeminiProxyError, generateContent } = require('./gemini');
 
 const app = express();
-const port = Number(process.env.API_PORT || 3333);
+const port = Number(process.env.PORT || process.env.API_PORT || 3333);
 
 app.use(cors());
 app.use(express.json({ limit: '12mb' }));
