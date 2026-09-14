@@ -5,6 +5,9 @@
   "build": {
     "preview": {
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://caloriq-api-j61f.onrender.com"
+      },
       "android": {
         "buildType": "apk"
       }
