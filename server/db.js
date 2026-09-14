@@ -1,15 +1,26 @@
 const { Pool } = require('pg');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const databaseUrl = process.env.DATABASE_URL || '';
 const isLocalDatabase = /(?:localhost|127\.0\.0\.1)/i.test(databaseUrl);
+const connectionString = databaseUrl.replace(
+  /([?&])sslmode=[^&]*(&|$)/i,
+  (_match, separator, remainder) => (remainder ? separator : ''),
+);
+const supabaseRootCertificate = fs.readFileSync(
+  path.join(__dirname, 'certs', 'supabase-root-2021.crt'),
+  'utf8',
+);
 
 const pool = new Pool({
-  connectionString: databaseUrl,
+  connectionString,
   connectionTimeoutMillis: 5000,
-  // O pool IPv4 do Supabase usa uma cadeia de certificados gerenciada pelo
-  // provedor. A conexão continua criptografada, mas não depende da CA local
-  // instalada na máquina ou no contêiner do Render.
-  ssl: databaseUrl && !isLocalDatabase ? { rejectUnauthorized: false } : false,
+  // Mantém a conexão remota criptografada e valida o servidor usando a CA
+  // oficial disponibilizada nas configurações do projeto Supabase.
+  ssl: databaseUrl && !isLocalDatabase
+    ? { ca: supabaseRootCertificate, rejectUnauthorized: true }
+    : false,
 });
 
 pool.on('error', (error) => {
