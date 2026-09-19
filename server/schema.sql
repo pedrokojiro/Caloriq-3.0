@@ -12,6 +12,12 @@ CREATE TABLE IF NOT EXISTS users (
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(254);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS age INTEGER;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS height_cm NUMERIC(6,2);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS calculation_sex VARCHAR(12);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS activity_level VARCHAR(24);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS objective VARCHAR(16);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN NOT NULL DEFAULT TRUE;
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_idx ON users (LOWER(email)) WHERE email IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS auth_sessions (
@@ -73,29 +79,8 @@ CREATE TABLE IF NOT EXISTS water_entries (
 
 CREATE INDEX IF NOT EXISTS water_user_consumed_idx ON water_entries(user_id, consumed_at DESC);
 
-INSERT INTO users (id, name, weight, avatar_text, streak)
-VALUES ('local-user', 'Pedro', 78, 'P', 12)
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO nutrition_goals (user_id, calories, protein, carbs, fat, water)
-VALUES ('local-user', 2000, 150, 200, 65, 2500)
-ON CONFLICT (user_id) DO NOTHING;
-
-INSERT INTO meals (id, user_id, name, type, calories, protein, carbs, fat, portions, emoji, confidence, consumed_at)
-VALUES
-  ('meal-1', 'local-user', 'Panqueca de Aveia e Whey', 'Café da manhã', 410, 30, 45, 10, 1, '🥞', 96, CURRENT_DATE + TIME '08:15'),
-  ('meal-2', 'local-user', 'Salada com Frango Grelhado', 'Almoço', 480, 42, 18, 12, 1.2, '🥗', 94, CURRENT_DATE + TIME '12:30')
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO meal_items (id, meal_id, name, amount, calories, protein, carbs, fat)
-VALUES
-  ('item-1', 'meal-1', 'Whey Protein', '30g', 120, 24, 3, 1),
-  ('item-2', 'meal-1', 'Farinha de Aveia', '50g', 190, 6, 32, 4),
-  ('item-3', 'meal-1', 'Banana Prata', '1 unidade', 100, 1, 25, 0),
-  ('item-4', 'meal-2', 'Peito de Frango Grelhado', '150g', 220, 35, 0, 8),
-  ('item-5', 'meal-2', 'Mix de Folhas Verdes', '100g', 20, 1, 4, 0),
-  ('item-6', 'meal-2', 'Azeite de Oliva Extra Virgem', '1 colher de sopa', 140, 0, 0, 15),
-  ('item-7', 'meal-2', 'Cenoura Ralada', '50g', 20, 0.5, 5, 0)
-ON CONFLICT (id) DO NOTHING;
+-- Remove os registros de demonstração criados pelas versões antigas.
+-- Contas e refeições reais usam UUIDs e não são afetadas.
+DELETE FROM users WHERE id = 'local-user';
 
 COMMIT;

@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 import { readSettings } from './local-settings';
 import { readAuthToken } from './auth-storage';
 import type { AppState, Meal, NutritionGoals, UserProfile } from '../types';
+import type { NutritionProfileInput } from '../utils/nutrition';
 
 const fallbackHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
 const configuredUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
@@ -41,10 +42,11 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
 };
 
 export const caloriqApi = {
-  register: (data: { name: string; email: string; password: string; weight: number }) => request<AuthResponse>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+  register: (data: { name: string; email: string; password: string }) => request<AuthResponse>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
   login: (email: string, password: string) => request<AuthResponse>('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   getCurrentUser: () => request<{ user: AuthUser }>('/api/auth/me'),
   logout: () => request<void>('/api/auth/logout', { method: 'POST' }),
+  completeOnboarding: (profile: NutritionProfileInput) => request<OnboardingResponse>('/api/onboarding', { method: 'PUT', body: JSON.stringify(profile) }),
   getDatabaseDiagnostics: (signal: AbortSignal) => request<DatabaseDiagnostics>('/api/diagnostics/database', { signal, cache: 'no-store' }),
   getState: () => request<AppState>('/api/state'),
   updateProfile: (profile: Partial<UserProfile>) => request('/api/profile', { method: 'PUT', body: JSON.stringify(profile) }),
@@ -55,5 +57,10 @@ export const caloriqApi = {
   addWater: (amount: number) => request('/api/water', { method: 'POST', body: JSON.stringify({ amount }) }),
 };
 
-export interface AuthUser { id: string; name: string; email: string }
+export interface AuthUser { id: string; name: string; email: string; onboardingCompleted: boolean }
 export interface AuthResponse { token: string; user: AuthUser }
+export interface OnboardingResponse {
+  user: AuthUser;
+  profile: NutritionProfileInput & { bmr: number; dailyExpenditure: number };
+  goals: NutritionGoals;
+}

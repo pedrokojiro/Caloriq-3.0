@@ -13,9 +13,6 @@ interface InputProps {
   inputStyle?: StyleProp<TextStyle>;
   rightIcon?: React.ReactNode;
   onRightIconPress?: () => void;
-  focused?: boolean;
-  onFocus?: () => void;
-  onBlur?: () => void;
   autoCapitalize?: TextInputProps['autoCapitalize'];
   autoCorrect?: boolean;
   autoComplete?: TextInputProps['autoComplete'];
@@ -34,17 +31,13 @@ export const Input: React.FC<InputProps> = ({
   inputStyle,
   rightIcon,
   onRightIconPress,
-  focused,
-  onFocus,
-  onBlur,
   autoCapitalize,
   autoCorrect,
   autoComplete,
   textContentType,
   importantForAutofill,
 }) => {
-  const { colors, globalColors } = useTheme();
-  const isFocused = focused ?? false;
+  const { colors } = useTheme();
 
   return (
     <View style={[styles.container, style]}>
@@ -56,14 +49,7 @@ export const Input: React.FC<InputProps> = ({
           styles.inputWrapper,
           {
             backgroundColor: colors.inputBg,
-            borderColor: isFocused ? globalColors.primaryGlow : colors.inputBorder,
-          },
-          isFocused && {
-            shadowColor: globalColors.primaryGlow,
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0.15,
-            shadowRadius: 4,
-            elevation: 2,
+            borderColor: colors.inputBorder,
           },
         ]}
       >
@@ -79,12 +65,8 @@ export const Input: React.FC<InputProps> = ({
           autoComplete={autoComplete}
           textContentType={textContentType}
           importantForAutofill={importantForAutofill}
-          onFocus={() => {
-            onFocus?.();
-          }}
-          onBlur={() => {
-            onBlur?.();
-          }}
+          underlineColorAndroid="transparent"
+          disableFullscreenUI
           style={[styles.input, { color: colors.textMain }, inputStyle]}
         />
         {rightIcon && (

@@ -12,13 +12,13 @@ export default function MealResultModal() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { colors, globalColors, theme } = useTheme();
-  const { mockScannerScan, addMeal } = useAppState();
+  const { addMeal } = useAppState();
 
-  const foodName = (params.foodName as string) || 'Salada com Frango';
+  const foodName = (params.foodName as string) || 'Refeição';
   const imageUri = params.imageUri as string | undefined;
   const scannedDataStr = params.scannedData as string | undefined;
   
-  // Parse scannedData if available, otherwise fallback to mockScannerScan
+  // Somente dados retornados pela análise real são exibidos automaticamente.
   const mealData = React.useMemo(() => {
     if (scannedDataStr) {
       try {
@@ -47,10 +47,21 @@ export default function MealResultModal() {
         };
       } catch (err) {
         console.error("Erro ao fazer parse dos dados escaneados:", err);
-        return mockScannerScan(foodName);
       }
     }
-    return mockScannerScan(foodName);
+    return {
+      name: foodName,
+      emoji: '🍽️',
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      confidence: 0,
+      portions: 1,
+      items: [],
+      insights: undefined,
+      type: 'Almoço' as const,
+    };
   }, [scannedDataStr, foodName]);
 
   const handleSave = () => {
@@ -182,7 +193,7 @@ export default function MealResultModal() {
                 Insight Nutricional ✨
               </Text>
               <Text style={[styles.insightDesc, { color: theme === 'dark' ? '#CBD0D8' : '#0F6E3A' }]}>
-                {mealData.insights || "Ótima fonte de proteína magra e baixa densidade calórica. Alinha-se muito bem com seus objetivos diários."}
+                {mealData.insights || 'Confira os alimentos identificados e altere manualmente qualquer valor antes de salvar.'}
               </Text>
             </View>
           </Card>
@@ -197,10 +208,11 @@ export default function MealResultModal() {
               icon={<Ionicons name="checkmark-sharp" size={18} color="#FFFFFF" />}
             />
             <Button
-              title="Ajustar itens manualmente"
+              title="Alterar manualmente"
               onPress={handleAdjust}
               variant="secondary"
               style={styles.adjustBtn}
+              icon={<Ionicons name="create-outline" size={18} color={colors.textMain} />}
             />
             <Button
               title="Descartar"
@@ -405,4 +417,3 @@ const styles = StyleSheet.create({
     height: 52,
   },
 });
-

@@ -4,8 +4,10 @@ import { useTheme } from '../../src/hooks/useTheme';
 import { useAppState } from '../../src/hooks/useAppState';
 import { BaseScreen, Card, Input, Button } from '../../src/components';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 export default function GoalsScreen() {
+  const router = useRouter();
   const { colors, globalColors } = useTheme();
   const { state, updateGoals, updateProfile } = useAppState();
 
@@ -15,14 +17,6 @@ export default function GoalsScreen() {
   const [carbs, setCarbs] = useState(state.goals.carbs.toString());
   const [fat, setFat] = useState(state.goals.fat.toString());
   const [water, setWater] = useState(state.goals.water.toString());
-  const [focusedField, setFocusedField] = useState<string | null>(null);
-
-  const focusProps = (field: string) => ({
-    focused: focusedField === field,
-    onFocus: () => setFocusedField(field),
-    onBlur: () => setFocusedField((current) => current === field ? null : current),
-  });
-
   const handleSave = () => {
     const numWeight = parseFloat(weight);
     const numCalories = parseInt(calories);
@@ -90,7 +84,6 @@ export default function GoalsScreen() {
             onChangeText={setWeight}
             placeholder="Ex: 75"
             keyboardType="numeric"
-            {...focusProps('weight')}
           />
         </Card>
 
@@ -109,7 +102,6 @@ export default function GoalsScreen() {
             onChangeText={setCalories}
             placeholder="Ex: 2000"
             keyboardType="numeric"
-            {...focusProps('calories')}
           />
 
           <Input
@@ -118,7 +110,6 @@ export default function GoalsScreen() {
             onChangeText={setWater}
             placeholder="Ex: 2500"
             keyboardType="numeric"
-            {...focusProps('water')}
           />
         </Card>
 
@@ -138,7 +129,6 @@ export default function GoalsScreen() {
             placeholder="Ex: 150"
             keyboardType="numeric"
             inputStyle={{ color: globalColors.protein, fontWeight: '700' }}
-            {...focusProps('protein')}
           />
 
           <Input
@@ -148,7 +138,6 @@ export default function GoalsScreen() {
             placeholder="Ex: 200"
             keyboardType="numeric"
             inputStyle={{ color: globalColors.carbs, fontWeight: '700' }}
-            {...focusProps('carbs')}
           />
 
           <Input
@@ -158,11 +147,17 @@ export default function GoalsScreen() {
             placeholder="Ex: 65"
             keyboardType="numeric"
             inputStyle={{ color: globalColors.fat, fontWeight: '700' }}
-            {...focusProps('fat')}
           />
         </Card>
 
         {/* Save CTA */}
+        <Button
+          title="Recalcular pelo meu perfil"
+          onPress={() => router.push('/(auth)/profile-setup' as never)}
+          variant="outline"
+          style={styles.recalculateBtn}
+          icon={<Ionicons name="calculator-outline" size={18} color={globalColors.primary} />}
+        />
         <Button
           title="Salvar Alterações"
           onPress={handleSave}
@@ -237,6 +232,10 @@ const styles = StyleSheet.create({
   saveBtn: {
     marginTop: 10,
     height: 54,
+  },
+  recalculateBtn: {
+    marginTop: 10,
+    height: 52,
   },
   bottomSpacer: {
     height: 100,

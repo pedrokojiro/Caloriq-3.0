@@ -12,6 +12,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "expo": "~56.0.12",
+    "expo-camera": "~56.0.8",
     "expo-constants": "~56.0.18",
     "expo-device": "~56.0.4",
     "expo-font": "~56.0.7",
@@ -60,7 +61,8 @@
     "db:migrate": "node server/migrate.js",
     "db:setup": "node scripts/setup-local-db.js",
     "apresentar": "node scripts/present.js",
-    "configurar": "node scripts/configure-local.js"
+    "configurar": "node scripts/configure-local.js",
+    "test": "node --test server/*.test.js"
   },
   "private": true
 }

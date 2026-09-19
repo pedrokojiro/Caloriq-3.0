@@ -13,6 +13,7 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   if (loading) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator /></View>;
   if (!user) return <Redirect href="/(auth)/login" />;
+  if (!user.onboardingCompleted) return <Redirect href={'/(auth)/profile-setup' as never} />;
 
   return (
     <Tabs
@@ -20,7 +21,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarShowLabel: false,
       }}
-      tabBar={({ state, descriptors, navigation }) => {
+      tabBar={({ state, navigation }) => {
         return (
           <View
             style={[
@@ -33,7 +34,6 @@ export default function TabLayout() {
             ]}
           >
             {state.routes.map((route, index) => {
-              const { options } = descriptors[route.key];
               const isFocused = state.index === index;
 
               const onPress = () => {

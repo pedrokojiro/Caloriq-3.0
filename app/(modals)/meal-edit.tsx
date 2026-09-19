@@ -1,74 +1,66 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, Pressable, TextInput, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAppState } from '../../src/hooks/useAppState';
 import { BaseScreen, Button, Card, Input } from '../../src/components';
 import { Ionicons } from '@expo/vector-icons';
-import { Meal, MealItem, MealType } from '../../src/types';
+import { MealItem, MealType } from '../../src/types';
 
-export default function MealEditModal() {
-  const router = useRouter();
-  const params = useLocalSearchParams();
-  const { colors, globalColors } = useTheme();
-  const { state, addMeal, updateMeal, deleteMeal, mockScannerScan } = useAppState();
+function editableMealData(
+  existingMeal: ReturnType<typeof useAppState>['state']['meals'][number] | undefined,
+  foodName: string | string[] | undefined,
+  scannedData: string | string[] | undefined,
+  mode: string | string[] | undefined,
+) {
+  if (existingMeal) {
+    return { name: existingMeal.name, type: existingMeal.type, portions: existingMeal.portions, items: [...existingMeal.items] };
+  }
 
-  const { mealId, foodName, mode, scannedData } = params;
-
-  // Local state for the editable meal
-  const [name, setName] = useState('Refeição');
-  const [type, setType] = useState<MealType>('Almoço');
-  const [portions, setPortions] = useState(1);
-  const [items, setItems] = useState<MealItem[]>([]);
-
-  // Load initial data based on mode
-  useEffect(() => {
-    if (mealId) {
-      // Mode 1: Edit existing logged meal
-      const existingMeal = state.meals.find((m) => m.id === mealId);
-      if (existingMeal) {
-        setName(existingMeal.name);
-        setType(existingMeal.type);
-        setPortions(existingMeal.portions);
-        setItems([...existingMeal.items]);
-      }
-    } else if (foodName) {
-      // Mode 2: Adjust newly scanned food
-      let initialData;
-      if (scannedData) {
-        try {
-          initialData = JSON.parse(scannedData as string);
-        } catch (err) {
-          console.error("Erro ao fazer parse no meal-edit:", err);
-        }
-      }
-      if (!initialData) {
-        initialData = mockScannerScan(foodName as string);
-      }
-      setName(initialData.name);
-      setType(initialData.type || 'Almoço');
-      setPortions(initialData.portions || 1);
-      
-      const itemsWithId = (initialData.items || []).map((item: any, idx: number) => ({
-        id: item.id || `gemini-item-${idx}`,
+  if (foodName) {
+    let parsed: any;
+    if (scannedData) {
+      try { parsed = JSON.parse(scannedData as string); } catch { /* Abre zerado para correção manual. */ }
+    }
+    const data = parsed || { name: foodName as string, type: 'Almoço', portions: 1, items: [] };
+    return {
+      name: data.name || String(foodName),
+      type: (data.type || 'Almoço') as MealType,
+      portions: data.portions || 1,
+      items: (data.items || []).map((item: any, index: number) => ({
+        id: item.id || `scan-item-${index}`,
         name: item.name || '',
         calories: item.calories || 0,
         protein: item.protein || 0,
         carbs: item.carbs || 0,
         fat: item.fat || 0,
-        amount: item.amount || '1 porção'
-      }));
-      setItems(itemsWithId);
-    } else if (mode === 'create') {
-      // Mode 3: Create from scratch
-      setName('Refeição Manual');
-      setType('Almoço');
-      setPortions(1);
-      setItems([
-        { id: '1', name: 'Alimento 1', calories: 100, protein: 10, carbs: 12, fat: 2, amount: '100g' }
-      ]);
-    }
-  }, [mealId, foodName, mode]);
+        amount: item.amount || '',
+      })) as MealItem[],
+    };
+  }
+
+  if (mode === 'create') {
+    return { name: '', type: 'Almoço' as MealType, portions: 1, items: [{ id: '1', name: '', calories: 0, protein: 0, carbs: 0, fat: 0, amount: '' }] };
+  }
+
+  return { name: '', type: 'Almoço' as MealType, portions: 1, items: [] as MealItem[] };
+}
+
+export default function MealEditModal() {
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const { colors, globalColors } = useTheme();
+  const { state, addMeal, updateMeal, deleteMeal } = useAppState();
+
+  const { mealId, foodName, mode, scannedData } = params;
+  const existingMeal = mealId ? state.meals.find(item => item.id === mealId) : undefined;
+  const initialData = editableMealData(existingMeal, foodName, scannedData, mode);
+
+  // Local state for the editable meal
+  const [name, setName] = useState(initialData.name);
+  const [type, setType] = useState<MealType>(initialData.type);
+  const [portions, setPortions] = useState(initialData.portions);
+  const [items, setItems] = useState<MealItem[]>(initialData.items);
 
   // Recalculate macro sums
   const getTotals = () => {
@@ -112,12 +104,12 @@ export default function MealEditModal() {
   const handleAddItem = () => {
     const newItem: MealItem = {
       id: `item-${Date.now()}`,
-      name: 'Novo Alimento',
-      calories: 100,
-      protein: 10,
-      carbs: 10,
-      fat: 2,
-      amount: '100g',
+      name: '',
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      amount: '',
     };
     setItems([...items, newItem]);
   };
@@ -136,6 +128,11 @@ export default function MealEditModal() {
       return;
     }
 
+    let scannedMetadata: { emoji?: string; confidence?: number } = {};
+    if (scannedData) {
+      try { scannedMetadata = JSON.parse(scannedData as string); } catch { /* Campos manuais continuam válidos. */ }
+    }
+    const existingMeal = mealId ? state.meals.find(m => m.id === mealId) : undefined;
     const updatedMealData = {
       name,
       type,
@@ -144,8 +141,8 @@ export default function MealEditModal() {
       protein: items.reduce((sum, item) => sum + (item.protein || 0), 0),
       carbs: items.reduce((sum, item) => sum + (item.carbs || 0), 0),
       fat: items.reduce((sum, item) => sum + (item.fat || 0), 0),
-      emoji: mealId ? (state.meals.find(m => m.id === mealId)?.emoji || '🍽️') : (foodName ? mockScannerScan(foodName as string).emoji : '✏️'),
-      confidence: mealId ? (state.meals.find(m => m.id === mealId)?.confidence || 100) : (foodName ? mockScannerScan(foodName as string).confidence : 100),
+      emoji: existingMeal?.emoji || scannedMetadata.emoji || '🍽️',
+      confidence: existingMeal?.confidence ?? scannedMetadata.confidence ?? 100,
       items,
     };
 
@@ -155,6 +152,7 @@ export default function MealEditModal() {
         ...updatedMealData,
         id: mealId as string,
         time: state.meals.find(m => m.id === mealId)?.time || '00:00',
+        consumedAt: state.meals.find(m => m.id === mealId)?.consumedAt,
       });
       Alert.alert('Sucesso', 'Refeição atualizada!');
     } else {

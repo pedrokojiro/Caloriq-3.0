@@ -21,6 +21,7 @@ export interface Meal {
   portions: number;
   emoji: string;
   time: string;
+  consumedAt?: string;
   confidence: number; // Porcentagem de certeza da IA (ex: 94)
   items: MealItem[];
   insights?: string;
@@ -31,6 +32,12 @@ export interface UserProfile {
   streak: number;
   weight: number; // Peso atual em kg
   avatarText: string;
+  age?: number;
+  heightCm?: number;
+  calculationSex?: 'female' | 'male';
+  activityLevel?: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
+  objective?: 'lose' | 'maintain' | 'gain';
+  onboardingCompleted?: boolean;
 }
 
 export interface NutritionGoals {

@@ -1,12 +1,14 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { caloriqApi, type AuthUser } from '../services/api';
+import type { NutritionProfileInput } from '../utils/nutrition';
 import { clearAuthToken, readAuthToken, saveAuthToken } from '../services/auth-storage';
 
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (data: { name: string; email: string; password: string; weight: number }) => Promise<void>;
+  login: (email: string, password: string) => Promise<AuthUser>;
+  register: (data: { name: string; email: string; password: string }) => Promise<AuthUser>;
+  completeOnboarding: (profile: NutritionProfileInput) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -27,12 +29,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const accept = async (result: Awaited<ReturnType<typeof caloriqApi.login>>) => {
     await saveAuthToken(result.token);
     setUser(result.user);
+    return result.user;
   };
 
   return <AuthContext.Provider value={{
     user, loading,
     login: async (email, password) => accept(await caloriqApi.login(email, password)),
     register: async data => accept(await caloriqApi.register(data)),
+    completeOnboarding: async profile => {
+      const result = await caloriqApi.completeOnboarding(profile);
+      setUser(result.user);
+    },
     logout: async () => {
       try { await caloriqApi.logout(); } finally { await clearAuthToken(); setUser(null); }
     },

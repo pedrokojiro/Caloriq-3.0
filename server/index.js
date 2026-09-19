@@ -5,6 +5,7 @@ const { randomUUID } = require('node:crypto');
 const { pool } = require('./db');
 const { normalizeEmail, validEmail, hashPassword, verifyPassword, createSessionToken, hashToken, sessionExpiry } = require('./auth');
 const { GeminiProxyError, generateContent } = require('./gemini');
+const { calculateNutritionTargets, validateProfile } = require('./nutrition');
 
 const app = express();
 const port = Number(process.env.PORT || process.env.API_PORT || 3333);
@@ -24,23 +25,21 @@ app.post('/api/auth/register', async (request, response, next) => {
   const name = String(body.name || '').trim();
   const email = normalizeEmail(body.email);
   const password = String(body.password || '');
-  const weight = Number(body.weight || 70);
   if (name.length < 2 || name.length > 120) return response.status(400).json({ error: 'Informe um nome válido.' });
   if (!validEmail(email)) return response.status(400).json({ error: 'Informe um e-mail válido.' });
   if (password.length < 8 || password.length > 128) return response.status(400).json({ error: 'A senha deve ter entre 8 e 128 caracteres.' });
-  if (!Number.isFinite(weight) || weight <= 0 || weight > 999) return response.status(400).json({ error: 'Informe um peso válido.' });
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const id = randomUUID();
     const avatarText = Array.from(name)[0].toUpperCase();
-    await client.query(`INSERT INTO users (id, name, email, password_hash, weight, avatar_text, streak)
-      VALUES ($1,$2,$3,$4,$5,$6,0)`, [id, name, email, hashPassword(password), weight, avatarText]);
+    await client.query(`INSERT INTO users (id, name, email, password_hash, weight, avatar_text, streak, onboarding_completed)
+      VALUES ($1,$2,$3,$4,70,$5,0,FALSE)`, [id, name, email, hashPassword(password), avatarText]);
     await client.query(`INSERT INTO nutrition_goals (user_id, calories, protein, carbs, fat, water)
       VALUES ($1,2000,150,200,65,2500)`, [id]);
     const token = await issueSession(client, id);
     await client.query('COMMIT');
-    response.status(201).json({ token, user: { id, name, email } });
+    response.status(201).json({ token, user: { id, name, email, onboardingCompleted: false } });
   } catch (error) {
     await client.query('ROLLBACK');
     if (error.code === '23505') return response.status(409).json({ error: 'Este e-mail já está cadastrado.' });
@@ -53,13 +52,13 @@ app.post('/api/auth/login', async (request, response, next) => {
     const body = request.body || {};
     const email = normalizeEmail(body.email);
     const password = String(body.password || '');
-    const result = await pool.query('SELECT id, name, email, password_hash FROM users WHERE LOWER(email) = $1', [email]);
+    const result = await pool.query('SELECT id, name, email, password_hash, onboarding_completed FROM users WHERE LOWER(email) = $1', [email]);
     const user = result.rows[0];
     if (!user || !verifyPassword(password, user.password_hash)) {
       return response.status(401).json({ error: 'E-mail ou senha incorretos.' });
     }
     const token = await issueSession(pool, user.id);
-    response.json({ token, user: { id: user.id, name: user.name, email: user.email } });
+    response.json({ token, user: { id: user.id, name: user.name, email: user.email, onboardingCompleted: user.onboarding_completed } });
   } catch (error) { next(error); }
 });
 
@@ -67,7 +66,7 @@ async function authenticate(request, response, next) {
   try {
     const [scheme, token] = String(request.headers.authorization || '').split(' ');
     if (scheme !== 'Bearer' || !token) return response.status(401).json({ error: 'Faça login para continuar.' });
-    const result = await pool.query(`SELECT s.user_id, u.name, u.email FROM auth_sessions s
+    const result = await pool.query(`SELECT s.user_id, u.name, u.email, u.onboarding_completed FROM auth_sessions s
       JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > NOW()`, [hashToken(token)]);
     if (!result.rowCount) return response.status(401).json({ error: 'Sua sessão expirou. Entre novamente.' });
     request.userId = result.rows[0].user_id;
@@ -90,6 +89,7 @@ const mealFromRows = (meal, items) => ({
   emoji: meal.emoji,
   confidence: number(meal.confidence),
   insights: meal.insights || undefined,
+  consumedAt: new Date(meal.consumed_at).toISOString(),
   time: new Date(meal.consumed_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
   items: items.filter(item => item.meal_id === meal.id).map(item => ({
     id: item.id, name: item.name, amount: item.amount,
@@ -107,7 +107,8 @@ app.get('/health', async (_request, response, next) => {
 app.use('/api', authenticate);
 
 app.get('/api/auth/me', (request, response) => {
-  response.json({ user: { id: request.userId, name: request.authUser.name, email: request.authUser.email } });
+  response.json({ user: { id: request.userId, name: request.authUser.name, email: request.authUser.email,
+    onboardingCompleted: request.authUser.onboarding_completed } });
 });
 
 app.post('/api/auth/logout', async (request, response, next) => {
@@ -115,6 +116,40 @@ app.post('/api/auth/logout', async (request, response, next) => {
     await pool.query('DELETE FROM auth_sessions WHERE token_hash = $1', [request.authTokenHash]);
     response.status(204).end();
   } catch (error) { next(error); }
+});
+
+app.put('/api/onboarding', async (request, response, next) => {
+  const validation = validateProfile(request.body || {});
+  if (validation.error) return response.status(400).json({ error: validation.error });
+  const profile = validation.profile;
+  const goals = calculateNutritionTargets(profile);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const userResult = await client.query(
+      `UPDATE users SET weight = $2, age = $3, height_cm = $4, calculation_sex = $5,
+       activity_level = $6, objective = $7, onboarding_completed = TRUE, updated_at = NOW()
+       WHERE id = $1 RETURNING id, name, email`,
+      [request.userId, profile.weight, profile.age, profile.heightCm, profile.sex, profile.activityLevel, profile.objective]
+    );
+    await client.query(
+      `INSERT INTO nutrition_goals (user_id, calories, protein, carbs, fat, water)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (user_id) DO UPDATE SET calories = EXCLUDED.calories, protein = EXCLUDED.protein,
+       carbs = EXCLUDED.carbs, fat = EXCLUDED.fat, water = EXCLUDED.water, updated_at = NOW()`,
+      [request.userId, goals.calories, goals.protein, goals.carbs, goals.fat, goals.water]
+    );
+    await client.query('COMMIT');
+    const user = userResult.rows[0];
+    response.json({
+      user: { id: user.id, name: user.name, email: user.email, onboardingCompleted: true },
+      profile: { ...profile, bmr: goals.bmr, dailyExpenditure: goals.dailyExpenditure },
+      goals: { calories: goals.calories, protein: goals.protein, carbs: goals.carbs, fat: goals.fat, water: goals.water },
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    next(error);
+  } finally { client.release(); }
 });
 
 app.post('/api/ai/generate', async (request, response, next) => {
@@ -155,7 +190,8 @@ app.get('/api/state', async (_request, response, next) => {
   try {
     const userId = _request.userId;
     const [profileResult, goalsResult, mealsResult, itemsResult, waterResult] = await Promise.all([
-      pool.query('SELECT name, streak, weight, avatar_text FROM users WHERE id = $1', [userId]),
+      pool.query(`SELECT name, streak, weight, avatar_text, age, height_cm, calculation_sex,
+        activity_level, objective, onboarding_completed FROM users WHERE id = $1`, [userId]),
       pool.query('SELECT calories, protein, carbs, fat, water FROM nutrition_goals WHERE user_id = $1', [userId]),
       pool.query('SELECT * FROM meals WHERE user_id = $1 ORDER BY consumed_at DESC', [userId]),
       pool.query('SELECT mi.* FROM meal_items mi JOIN meals m ON m.id = mi.meal_id WHERE m.user_id = $1', [userId]),
@@ -164,7 +200,10 @@ app.get('/api/state', async (_request, response, next) => {
     const profile = profileResult.rows[0];
     const goals = goalsResult.rows[0];
     response.json({
-      profile: { name: profile.name, streak: profile.streak, weight: number(profile.weight), avatarText: profile.avatar_text },
+      profile: { name: profile.name, streak: profile.streak, weight: number(profile.weight), avatarText: profile.avatar_text,
+        age: profile.age, heightCm: profile.height_cm ? number(profile.height_cm) : undefined,
+        calculationSex: profile.calculation_sex || undefined, activityLevel: profile.activity_level || undefined,
+        objective: profile.objective || undefined, onboardingCompleted: profile.onboarding_completed },
       goals: { calories: goals.calories, protein: number(goals.protein), carbs: number(goals.carbs), fat: number(goals.fat), water: goals.water },
       meals: mealsResult.rows.map(meal => mealFromRows(meal, itemsResult.rows)),
       waterIntake: number(waterResult.rows[0].total),

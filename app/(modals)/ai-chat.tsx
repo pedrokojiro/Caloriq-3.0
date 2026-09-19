@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Easing, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { BaseScreen } from '../../src/components';
 import { useAppState } from '../../src/hooks/useAppState';
 import { useTheme } from '../../src/hooks/useTheme';
@@ -16,12 +17,19 @@ interface Message {
   excludeFromHistory?: boolean;
 }
 
+const MASCOT_IMAGE = require('../../assets/images/caloriq-ai-mascot.png');
+
 export default function AIChatModal() {
   const router = useRouter();
   const { colors, globalColors } = useTheme();
   const { state } = useAppState();
+  const { width } = useWindowDimensions();
   const scrollRef = useRef<ScrollView>(null);
+  const isInitialRender = useRef(true);
   const sending = useRef(false);
+  const [mascotFloat] = useState(() => new Animated.Value(0));
+  const mascotSize = Math.min(156, Math.max(108, width * 0.34));
+  const compactHero = width < 370;
 
   const [inputVal, setInputVal] = useState('');
   const [messages, setMessages] = useState<Message[]>([
@@ -42,8 +50,35 @@ export default function AIChatModal() {
   ]);
   const [isTyping, setIsTyping] = useState(false);
 
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(mascotFloat, {
+          toValue: -5,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(mascotFloat, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    animation.start();
+    return () => animation.stop();
+  }, [mascotFloat]);
+
   // Auto scroll to bottom when messages change
   useEffect(() => {
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      return;
+    }
+
     setTimeout(() => {
       scrollRef.current?.scrollToEnd({ animated: true });
     }, 100);
@@ -123,7 +158,12 @@ export default function AIChatModal() {
               colors={[globalColors.primaryGlow, globalColors.primary]}
               style={styles.botAvatar}
             >
-              <Text style={{ fontSize: 16 }}>🤖</Text>
+              <Image
+                source={MASCOT_IMAGE}
+                style={styles.headerMascot}
+                contentFit="contain"
+                accessibilityLabel="Mascote do assistente NutriCaloriQ"
+              />
             </LinearGradient>
             <View>
               <Text style={[styles.botName, { color: colors.textMain }]}>NutriCaloriQ IA</Text>
@@ -145,6 +185,34 @@ export default function AIChatModal() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         >
+          <View
+            style={[
+              styles.heroCard,
+              compactHero && styles.heroCardCompact,
+              { backgroundColor: colors.bgCard, borderColor: colors.borderColor },
+            ]}
+            accessible
+            accessibilityLabel="Q, o assistente nutricional do CaloriQ, está pronto para ajudar"
+          >
+            <Animated.View
+              style={[
+                styles.heroMascotWrap,
+                { width: mascotSize, height: mascotSize, transform: [{ translateY: mascotFloat }] },
+              ]}
+            >
+              <View style={[styles.mascotGlow, { backgroundColor: `${globalColors.primary}20` }]} />
+              <Image source={MASCOT_IMAGE} style={styles.heroMascot} contentFit="contain" />
+            </Animated.View>
+            <View style={[styles.heroCopy, compactHero && styles.heroCopyCompact]}>
+              <View style={[styles.aiBadge, compactHero && styles.aiBadgeCompact, { backgroundColor: `${globalColors.primary}18` }]}>
+                <View style={[styles.onlineDot, { backgroundColor: globalColors.primary }]} />
+                <Text style={[styles.aiBadgeText, { color: globalColors.primary }]}>IA NUTRICIONAL</Text>
+              </View>
+              <Text style={[styles.heroTitle, compactHero && styles.centeredText, { color: colors.textMain }]}>Oi, eu sou o Q!</Text>
+              <Text style={[styles.heroSubtitle, compactHero && styles.centeredText, { color: colors.textLight }]}>Seu parceiro para entender melhor refeições, calorias e nutrientes.</Text>
+            </View>
+          </View>
+
           {messages.map((msg) => {
             const isBot = msg.sender === 'bot';
             return (
@@ -155,9 +223,15 @@ export default function AIChatModal() {
                   isBot ? styles.alignLeft : styles.alignRight,
                 ]}
               >
+                {isBot && (
+                  <View style={[styles.messageAvatar, { backgroundColor: `${globalColors.primary}18` }]}>
+                    <Image source={MASCOT_IMAGE} style={styles.messageAvatarImage} contentFit="contain" />
+                  </View>
+                )}
                 <View
                   style={[
                     styles.messageBubble,
+                    isBot && styles.botMessageBubble,
                     isBot
                       ? [styles.botBubble, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]
                       : [styles.userBubble, { backgroundColor: globalColors.primary }],
@@ -186,6 +260,9 @@ export default function AIChatModal() {
 
           {isTyping && (
             <View style={[styles.messageBubbleWrapper, styles.alignLeft]}>
+              <View style={[styles.messageAvatar, { backgroundColor: `${globalColors.primary}18` }]}>
+                <Image source={MASCOT_IMAGE} style={styles.messageAvatarImage} contentFit="contain" />
+              </View>
               <View style={[styles.messageBubble, styles.botBubble, { backgroundColor: colors.bgCard, borderColor: colors.borderColor, flexDirection: 'row', gap: 4 }]}>
                 <View style={[styles.typingDot, { backgroundColor: colors.textLight }]} />
                 <View style={[styles.typingDot, { backgroundColor: colors.textLight, opacity: 0.6 }]} />
@@ -251,6 +328,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  headerMascot: {
+    width: 42,
+    height: 42,
   },
   botName: {
     fontSize: 15,
@@ -283,9 +365,87 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     gap: 14,
   },
+  heroCard: {
+    width: '100%',
+    minHeight: 176,
+    borderWidth: 1,
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  heroCardCompact: {
+    minHeight: 250,
+    flexDirection: 'column',
+    justifyContent: 'center',
+    paddingTop: 4,
+    paddingBottom: 18,
+  },
+  heroMascotWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  mascotGlow: {
+    position: 'absolute',
+    width: '78%',
+    height: '78%',
+    borderRadius: 999,
+  },
+  heroMascot: {
+    width: '100%',
+    height: '100%',
+  },
+  heroCopy: {
+    flex: 1,
+    minWidth: 0,
+    paddingLeft: 8,
+  },
+  heroCopyCompact: {
+    alignItems: 'center',
+    paddingLeft: 0,
+    marginTop: -4,
+  },
+  aiBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+    marginBottom: 8,
+  },
+  aiBadgeText: {
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  aiBadgeCompact: {
+    alignSelf: 'center',
+  },
+  centeredText: {
+    textAlign: 'center',
+  },
+  heroTitle: {
+    fontSize: 21,
+    lineHeight: 26,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  heroSubtitle: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
+  },
   messageBubbleWrapper: {
     width: '100%',
     flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 7,
   },
   alignLeft: {
     justifyContent: 'flex-start',
@@ -311,6 +471,22 @@ const styles = StyleSheet.create({
         elevation: 1,
       },
     }),
+  },
+  botMessageBubble: {
+    maxWidth: '80%',
+  },
+  messageAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    flexShrink: 0,
+  },
+  messageAvatarImage: {
+    width: 32,
+    height: 32,
   },
   botBubble: {
     borderWidth: 1,
