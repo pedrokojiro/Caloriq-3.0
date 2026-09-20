@@ -2,7 +2,7 @@
   "expo": {
     "name": "caloriq",
     "slug": "caloriq",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "caloriq",
@@ -12,7 +12,7 @@
     },
     "android": {
       "package": "com.pedrokojiro.caloriq",
-      "versionCode": 2,
+      "versionCode": 3,
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
