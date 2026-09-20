@@ -28,6 +28,8 @@ export default function AIChatModal() {
   const isInitialRender = useRef(true);
   const sending = useRef(false);
   const [mascotFloat] = useState(() => new Animated.Value(0));
+  const [heroEntrance] = useState(() => new Animated.Value(0));
+  const [typingDots] = useState(() => [new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]);
   const mascotSize = Math.min(156, Math.max(108, width * 0.34));
   const compactHero = width < 370;
 
@@ -54,14 +56,14 @@ export default function AIChatModal() {
     const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(mascotFloat, {
-          toValue: -5,
-          duration: 1500,
+          toValue: -11,
+          duration: 1100,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
         Animated.timing(mascotFloat, {
           toValue: 0,
-          duration: 1500,
+          duration: 1100,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
@@ -69,8 +71,35 @@ export default function AIChatModal() {
     );
 
     animation.start();
+    Animated.spring(heroEntrance, {
+      toValue: 1,
+      damping: 13,
+      stiffness: 125,
+      mass: 0.8,
+      useNativeDriver: true,
+    }).start();
     return () => animation.stop();
-  }, [mascotFloat]);
+  }, [heroEntrance, mascotFloat]);
+
+  useEffect(() => {
+    if (!isTyping) {
+      typingDots.forEach(dot => dot.setValue(0));
+      return;
+    }
+
+    const animation = Animated.loop(
+      Animated.stagger(130, typingDots.map(dot => Animated.sequence([
+        Animated.timing(dot, { toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(dot, { toValue: 0, duration: 260, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+      ]))),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [isTyping, typingDots]);
+
+  const heroTranslateY = heroEntrance.interpolate({ inputRange: [0, 1], outputRange: [34, 0] });
+  const heroScale = heroEntrance.interpolate({ inputRange: [0, 1], outputRange: [0.84, 1] });
+  const mascotScale = mascotFloat.interpolate({ inputRange: [-11, 0], outputRange: [1.055, 1] });
 
   // Auto scroll to bottom when messages change
   useEffect(() => {
@@ -185,11 +214,12 @@ export default function AIChatModal() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         >
-          <View
+          <Animated.View
             style={[
               styles.heroCard,
               compactHero && styles.heroCardCompact,
               { backgroundColor: colors.bgCard, borderColor: colors.borderColor },
+              { opacity: heroEntrance, transform: [{ translateY: heroTranslateY }, { scale: heroScale }] },
             ]}
             accessible
             accessibilityLabel="Q, o assistente nutricional do CaloriQ, está pronto para ajudar"
@@ -197,7 +227,7 @@ export default function AIChatModal() {
             <Animated.View
               style={[
                 styles.heroMascotWrap,
-                { width: mascotSize, height: mascotSize, transform: [{ translateY: mascotFloat }] },
+                { width: mascotSize, height: mascotSize, transform: [{ translateY: mascotFloat }, { scale: mascotScale }] },
               ]}
             >
               <View style={[styles.mascotGlow, { backgroundColor: `${globalColors.primary}20` }]} />
@@ -211,7 +241,7 @@ export default function AIChatModal() {
               <Text style={[styles.heroTitle, compactHero && styles.centeredText, { color: colors.textMain }]}>Oi, eu sou o Q!</Text>
               <Text style={[styles.heroSubtitle, compactHero && styles.centeredText, { color: colors.textLight }]}>Seu parceiro para entender melhor refeições, calorias e nutrientes.</Text>
             </View>
-          </View>
+          </Animated.View>
 
           {messages.map((msg) => {
             const isBot = msg.sender === 'bot';
@@ -264,9 +294,22 @@ export default function AIChatModal() {
                 <Image source={MASCOT_IMAGE} style={styles.messageAvatarImage} contentFit="contain" />
               </View>
               <View style={[styles.messageBubble, styles.botBubble, { backgroundColor: colors.bgCard, borderColor: colors.borderColor, flexDirection: 'row', gap: 4 }]}>
-                <View style={[styles.typingDot, { backgroundColor: colors.textLight }]} />
-                <View style={[styles.typingDot, { backgroundColor: colors.textLight, opacity: 0.6 }]} />
-                <View style={[styles.typingDot, { backgroundColor: colors.textLight, opacity: 0.3 }]} />
+                {typingDots.map((dot, index) => (
+                  <Animated.View
+                    key={index}
+                    style={[
+                      styles.typingDot,
+                      {
+                        backgroundColor: colors.textLight,
+                        opacity: dot.interpolate({ inputRange: [0, 1], outputRange: [0.28, 1] }),
+                        transform: [
+                          { translateY: dot.interpolate({ inputRange: [0, 1], outputRange: [1, -7] }) },
+                          { scale: dot.interpolate({ inputRange: [0, 1], outputRange: [0.72, 1.3] }) },
+                        ],
+                      },
+                    ]}
+                  />
+                ))}
               </View>
             </View>
           )}

@@ -3,56 +3,49 @@ import { StyleSheet, Text, View, ScrollView, Pressable, Platform, Switch } from 
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAppState } from '../../src/hooks/useAppState';
-import { BaseScreen, Card } from '../../src/components';
+import { BaseScreen, Card, ProfileAvatar } from '../../src/components';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../src/context/AuthContext';
+
+function OptionItem({ icon, title, subtitle, onPress, iconColor, iconBg }: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle?: string;
+  onPress: () => void;
+  iconColor?: string;
+  iconBg?: string;
+}) {
+  const { colors } = useTheme();
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [
+      styles.optionItem,
+      { borderBottomColor: colors.borderColor },
+      pressed && { backgroundColor: colors.inputBg },
+    ]}>
+      <View style={[styles.optionIconContainer, { backgroundColor: iconBg || colors.inputBg }]}>
+        <Ionicons name={icon} size={20} color={iconColor || colors.textMuted} />
+      </View>
+      <View style={styles.optionTextContainer}>
+        <Text style={[styles.optionTitle, { color: colors.textMain }]}>{title}</Text>
+        {subtitle ? <Text style={[styles.optionSubtitle, { color: colors.textLight }]}>{subtitle}</Text> : null}
+      </View>
+      <Ionicons name="chevron-forward" size={20} color={colors.textLight} />
+    </Pressable>
+  );
+}
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { colors, globalColors, toggleTheme, theme, isDark } = useTheme();
+  const { colors, globalColors, toggleTheme, isDark } = useTheme();
   const { state } = useAppState();
   const { profile } = state;
   const { user, logout } = useAuth();
+  const showDevTools = process.env.EXPO_PUBLIC_DEV_TOOLS === 'true';
 
   const handleLogout = async () => {
     await logout();
     router.replace('/(auth)/login');
   };
-
-  const OptionItem = ({ 
-    icon, 
-    title, 
-    subtitle, 
-    onPress, 
-    iconColor = colors.textMuted,
-    iconBg = colors.inputBg 
-  }: { 
-    icon: string; 
-    title: string; 
-    subtitle?: string; 
-    onPress: () => void;
-    iconColor?: string;
-    iconBg?: string;
-  }) => (
-    <Pressable 
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.optionItem,
-        { borderBottomColor: colors.borderColor },
-        pressed && { backgroundColor: colors.inputBg }
-      ]}
-    >
-      <View style={[styles.optionIconContainer, { backgroundColor: iconBg }]}>
-        <Ionicons name={icon as any} size={20} color={iconColor} />
-      </View>
-      <View style={styles.optionTextContainer}>
-        <Text style={[styles.optionTitle, { color: colors.textMain }]}>{title}</Text>
-        {subtitle && <Text style={[styles.optionSubtitle, { color: colors.textLight }]}>{subtitle}</Text>}
-      </View>
-      <Ionicons name="chevron-forward" size={20} color={colors.textLight} />
-    </Pressable>
-  );
 
   return (
     <BaseScreen edges={['top', 'left', 'right']}>
@@ -68,12 +61,9 @@ export default function ProfileScreen() {
       >
         {/* User Card */}
         <Card style={styles.profileCard}>
-          <LinearGradient
-            colors={[globalColors.primaryGlow, globalColors.primary]}
-            style={styles.avatarGradient}
-          >
-            <Text style={styles.avatarText}>{profile.avatarText}</Text>
-          </LinearGradient>
+          <View style={styles.avatarShadow}>
+            <ProfileAvatar name={profile.name} avatarText={profile.avatarText} avatarUrl={profile.avatarUrl} size={80} />
+          </View>
           <Text style={[styles.profileName, { color: colors.textMain }]}>{profile.name}</Text>
           {user?.email ? <Text style={[styles.profileWeight, { color: colors.textMuted }]}>{user.email}</Text> : null}
           <Text style={[styles.profileWeight, { color: colors.textMuted }]}>
@@ -83,6 +73,7 @@ export default function ProfileScreen() {
 
         {/* Configurations List */}
         <Card style={styles.optionsListCard}>
+          {showDevTools ? <>
           <OptionItem
             icon="server-outline"
             iconColor={globalColors.primary}
@@ -99,12 +90,13 @@ export default function ProfileScreen() {
             subtitle="Verifique a conexão e os registros salvos"
             onPress={() => router.push('../sub-screens/database-diagnostics')}
           />
+          </> : null}
           <OptionItem
             icon="person-outline"
             iconColor={globalColors.primary}
             iconBg="#EDFBF3"
             title="Editar Perfil"
-            subtitle="Altere seu nome, peso e avatar"
+            subtitle="Foto, dados pessoais e perfil nutricional"
             onPress={() => router.push('/sub-screens/edit-profile')}
           />
           <OptionItem
@@ -202,23 +194,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 14,
   },
-  avatarGradient: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+  avatarShadow: {
     marginBottom: 16,
     shadowColor: '#1AAF5D',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 4,
-  },
-  avatarText: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#FFFFFF',
   },
   profileName: {
     fontSize: 20,

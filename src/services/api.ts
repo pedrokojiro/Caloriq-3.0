@@ -18,6 +18,13 @@ const apiPort = process.env.EXPO_PUBLIC_API_PORT || '3333';
 const API_URL = (configuredUrl && configuredUrl !== 'auto' ? configuredUrl : `http://${host}:${apiPort}`).replace(/\/$/, '');
 export const getApiUrl = async () => (await readSettings()).apiUrl || API_URL;
 
+const currentLocalDayBounds = () => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  return { dayStart: start.toISOString(), dayEnd: end.toISOString() };
+};
+
 export interface DatabaseDiagnostics {
   api: 'connected';
   database: 'connected' | 'unavailable';
@@ -48,8 +55,11 @@ export const caloriqApi = {
   logout: () => request<void>('/api/auth/logout', { method: 'POST' }),
   completeOnboarding: (profile: NutritionProfileInput) => request<OnboardingResponse>('/api/onboarding', { method: 'PUT', body: JSON.stringify(profile) }),
   getDatabaseDiagnostics: (signal: AbortSignal) => request<DatabaseDiagnostics>('/api/diagnostics/database', { signal, cache: 'no-store' }),
-  getState: () => request<AppState>('/api/state'),
-  updateProfile: (profile: Partial<UserProfile>) => request('/api/profile', { method: 'PUT', body: JSON.stringify(profile) }),
+  getState: () => {
+    const { dayStart, dayEnd } = currentLocalDayBounds();
+    return request<AppState>(`/api/state?dayStart=${encodeURIComponent(dayStart)}&dayEnd=${encodeURIComponent(dayEnd)}`);
+  },
+  updateProfile: (profile: ProfileUpdateInput) => request<ProfileUpdateResponse>('/api/profile', { method: 'PUT', body: JSON.stringify(profile) }),
   updateGoals: (goals: Partial<NutritionGoals>) => request('/api/goals', { method: 'PUT', body: JSON.stringify(goals) }),
   createMeal: (meal: Meal) => request('/api/meals', { method: 'POST', body: JSON.stringify(meal) }),
   updateMeal: (meal: Meal) => request(`/api/meals/${encodeURIComponent(meal.id)}`, { method: 'PUT', body: JSON.stringify(meal) }),
@@ -64,3 +74,5 @@ export interface OnboardingResponse {
   profile: NutritionProfileInput & { bmr: number; dailyExpenditure: number };
   goals: NutritionGoals;
 }
+export type ProfileUpdateInput = Omit<Partial<UserProfile>, 'avatarUrl'> & { avatarUrl?: string | null; recalculateGoals?: boolean };
+export interface ProfileUpdateResponse { profile: UserProfile; goals?: NutritionGoals }

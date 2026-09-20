@@ -1,6 +1,8 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { AppState as NativeAppState } from 'react-native';
 import { Meal, UserProfile, NutritionGoals, AppState } from '../types';
 import { caloriqApi } from '../services/api';
+import type { ProfileUpdateInput } from '../services/api';
 import { subscribeSettings } from '../services/local-settings';
 import { useAuth } from './AuthContext';
 
@@ -11,7 +13,7 @@ interface AppContextProps {
   deleteMeal: (mealId: string) => void;
   addWater: (amount: number) => void;
   updateGoals: (goals: Partial<NutritionGoals>) => void;
-  updateProfile: (profile: Partial<UserProfile>) => void;
+  updateProfile: (profile: ProfileUpdateInput) => Promise<void>;
 }
 
 const initialProfile: UserProfile = {
@@ -30,6 +32,7 @@ const initialGoals: NutritionGoals = {
 };
 
 const AppStateContext = createContext<AppContextProps | undefined>(undefined);
+const localDayKey = (date = new Date()) => `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
 
 export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
@@ -37,9 +40,41 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [goals, setGoals] = useState<NutritionGoals>(initialGoals);
   const [meals, setMeals] = useState<Meal[]>([]);
   const [waterIntake, setWaterIntake] = useState(0);
+  const waterIntakeRef = useRef(0);
+  const [activeDayKey, setActiveDayKey] = useState(() => localDayKey());
+  const activeDayRef = useRef(activeDayKey);
   const [settingsVersion, setSettingsVersion] = useState(0);
 
   useEffect(() => subscribeSettings(() => setSettingsVersion(value => value + 1)), []);
+
+  useEffect(() => {
+    let midnightTimer: ReturnType<typeof setTimeout>;
+    const refreshDay = () => {
+      const next = localDayKey();
+      if (activeDayRef.current === next) return;
+      activeDayRef.current = next;
+      waterIntakeRef.current = 0;
+      setWaterIntake(0);
+      setMeals(current => [...current]);
+      setActiveDayKey(next);
+    };
+    const scheduleMidnightRefresh = () => {
+      const now = new Date();
+      const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
+      midnightTimer = setTimeout(() => {
+        refreshDay();
+        scheduleMidnightRefresh();
+      }, tomorrow.getTime() - now.getTime());
+    };
+    scheduleMidnightRefresh();
+    const subscription = NativeAppState.addEventListener('change', status => {
+      if (status === 'active') refreshDay();
+    });
+    return () => {
+      clearTimeout(midnightTimer);
+      subscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -50,11 +85,12 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setProfile(serverState.profile);
         setGoals(serverState.goals);
         setMeals(serverState.meals);
-        setWaterIntake(serverState.waterIntake);
+        waterIntakeRef.current = Math.max(0, serverState.waterIntake);
+        setWaterIntake(waterIntakeRef.current);
       })
       .catch(error => console.warn('Os dados da conta não puderam ser carregados.', error));
     return () => { active = false; };
-  }, [settingsVersion, user]);
+  }, [activeDayKey, settingsVersion, user]);
 
   const addMeal = (mealData: Omit<Meal, 'id' | 'time'>): Meal => {
     const now = new Date();
@@ -80,8 +116,12 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const addWater = (amount: number) => {
-    setWaterIntake(current => Math.max(0, current + amount));
-    void caloriqApi.addWater(amount).catch(error => console.warn('Não foi possível registrar a água no PostgreSQL.', error));
+    const next = Math.max(0, waterIntakeRef.current + amount);
+    const appliedAmount = next - waterIntakeRef.current;
+    if (appliedAmount === 0) return;
+    waterIntakeRef.current = next;
+    setWaterIntake(next);
+    void caloriqApi.addWater(appliedAmount).catch(error => console.warn('Não foi possível registrar a água no PostgreSQL.', error));
   };
 
   const updateGoals = (newGoals: Partial<NutritionGoals>) => {
@@ -89,9 +129,15 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     void caloriqApi.updateGoals(newGoals).catch(error => console.warn('Não foi possível atualizar as metas no PostgreSQL.', error));
   };
 
-  const updateProfile = (newProfile: Partial<UserProfile>) => {
-    setProfile(current => ({ ...current, ...newProfile }));
-    void caloriqApi.updateProfile(newProfile).catch(error => console.warn('Não foi possível atualizar o perfil no PostgreSQL.', error));
+  const updateProfile = async (newProfile: ProfileUpdateInput) => {
+    try {
+      const saved = await caloriqApi.updateProfile(newProfile);
+      setProfile(saved.profile);
+      if (saved.goals) setGoals(saved.goals);
+    } catch (error) {
+      console.warn('Não foi possível atualizar o perfil no PostgreSQL.', error);
+      throw error;
+    }
   };
 
   return (

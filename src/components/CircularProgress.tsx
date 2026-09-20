@@ -1,6 +1,8 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Animated, Easing, View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 interface CircularProgressProps {
   percentage: number; // 0 to 100
@@ -24,14 +26,24 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
   
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (clampedPercentage / 100) * circumference;
   const center = size / 2;
+  const [progress] = useState(() => new Animated.Value(0));
+  const strokeDashoffset = progress.interpolate({ inputRange: [0, 100], outputRange: [circumference, 0] });
+
+  useEffect(() => {
+    Animated.timing(progress, {
+      toValue: clampedPercentage,
+      duration: 850,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [clampedPercentage, progress]);
 
   return (
     <View style={[styles.container, { width: size, height: size }]}>
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         {/* Background track circle */}
-        <Circle
+        <AnimatedCircle
           cx={center}
           cy={center}
           r={radius}
@@ -48,7 +60,7 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
           stroke={color}
           strokeWidth={strokeWidth}
           strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
+          strokeDashoffset={strokeDashoffset as unknown as number}
           strokeLinecap="round"
           transform={`rotate(-90 ${center} ${center})`}
         />

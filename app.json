@@ -45,6 +45,13 @@
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": false
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permita que o CaloriQ acesse suas fotos para escolher uma imagem de perfil.",
+          "cameraPermission": "Permita que o CaloriQ use a câmera para criar sua foto de perfil."
+        }
       ]
     ],
     "experiments": {

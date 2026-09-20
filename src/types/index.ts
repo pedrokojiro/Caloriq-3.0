@@ -32,11 +32,14 @@ export interface UserProfile {
   streak: number;
   weight: number; // Peso atual em kg
   avatarText: string;
+  avatarUrl?: string;
   age?: number;
   heightCm?: number;
   calculationSex?: 'female' | 'male';
   activityLevel?: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
   objective?: 'lose' | 'maintain' | 'gain';
+  motivation?: string;
+  mindset?: 'disciplined' | 'strategist' | 'resilient' | 'balanced' | 'competitor';
   onboardingCompleted?: boolean;
 }
 

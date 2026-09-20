@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BaseScreen, Card, ProgressBar } from '../../src/components';
 import { useAppState } from '../../src/hooks/useAppState';
 import { useTheme } from '../../src/hooks/useTheme';
@@ -130,6 +130,7 @@ export default function AnalyticsScreen() {
   const { colors, globalColors } = useTheme();
   const { state } = useAppState();
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('week');
+  const [periodAnimation] = useState(() => new Animated.Value(0));
   const dailyMap = useMemo(() => buildDailyTotals(state.meals), [state.meals]);
   const analytics = useMemo(() => periodData(selectedPeriod, dailyMap, state.goals.calories), [dailyMap, selectedPeriod, state.goals.calories]);
   const streak = useMemo(() => currentStreak(dailyMap, new Date()), [dailyMap]);
@@ -142,6 +143,19 @@ export default function AnalyticsScreen() {
   const recentDays = [...analytics.days].reverse().slice(0, 5);
   const progress = (value: number, goal: number) => goal > 0 ? Math.min(value / goal, 1) : 0;
 
+  useEffect(() => {
+    periodAnimation.setValue(0);
+    Animated.timing(periodAnimation, {
+      toValue: 1,
+      duration: 820,
+      easing: Easing.out(Easing.back(1.15)),
+      useNativeDriver: false,
+    }).start();
+  }, [periodAnimation, selectedPeriod, state.meals.length]);
+
+  const contentTranslateY = periodAnimation.interpolate({ inputRange: [0, 1], outputRange: [26, 0] });
+  const contentScale = periodAnimation.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] });
+
   return (
     <BaseScreen edges={['top', 'left', 'right']}>
       <View style={[styles.header, { backgroundColor: colors.bgCard, borderBottomColor: colors.borderColor }]}>
@@ -152,7 +166,7 @@ export default function AnalyticsScreen() {
             ['month', 'Mês'],
             ['threeMonths', '3 meses'],
           ] as const).map(([value, label]) => (
-            <Pressable key={value} onPress={() => setSelectedPeriod(value)} style={[styles.pillTab, selectedPeriod === value && [styles.pillTabActive, { backgroundColor: colors.bgCard }]]}>
+            <Pressable key={value} onPress={() => setSelectedPeriod(value)} style={({ pressed }) => [styles.pillTab, pressed && styles.pillTabPressed, selectedPeriod === value && [styles.pillTabActive, { backgroundColor: colors.bgCard }]]}>
               <Text style={[styles.pillTabText, { color: selectedPeriod === value ? colors.textMain : colors.textLight }]}>{label}</Text>
             </Pressable>
           ))}
@@ -160,6 +174,7 @@ export default function AnalyticsScreen() {
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.bgApp }]} showsVerticalScrollIndicator={false}>
+        <Animated.View style={{ opacity: periodAnimation, transform: [{ translateY: contentTranslateY }, { scale: contentScale }] }}>
         <View style={styles.statsGrid}>
           <Card style={styles.statCard}>
             <View style={styles.statCardHeader}>
@@ -222,7 +237,18 @@ export default function AnalyticsScreen() {
                 return (
                   <View key={`${point.label}-${index}`} style={styles.barCol}>
                     <View style={[styles.barTrack, { backgroundColor: colors.inputBorder }]}>
-                      <View style={[styles.barFill, { height: `${heightPercentage}%`, backgroundColor: point.goalReached ? globalColors.primary : point.calories > 0 ? globalColors.water : 'transparent' }]} />
+                      <Animated.View
+                        style={[
+                          styles.barFill,
+                          {
+                            height: periodAnimation.interpolate({
+                              inputRange: [0, Math.min(0.55, 0.001 + (index * 0.075)), 1],
+                              outputRange: ['0%', '0%', `${heightPercentage}%`],
+                            }),
+                            backgroundColor: point.goalReached ? globalColors.primary : point.calories > 0 ? globalColors.water : 'transparent',
+                          },
+                        ]}
+                      />
                     </View>
                     <Text style={[styles.barLabel, { color: colors.textLight }]}>{point.label}</Text>
                   </View>
@@ -270,6 +296,7 @@ export default function AnalyticsScreen() {
           })}
         </View>
         <View style={styles.bottomSpacer} />
+        </Animated.View>
       </ScrollView>
     </BaseScreen>
   );
@@ -294,6 +321,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 24, fontWeight: '900', letterSpacing: -0.6 },
   pillTabs: { flexDirection: 'row', borderRadius: 12, borderWidth: 1, padding: 3 },
   pillTab: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8 },
+  pillTabPressed: { transform: [{ scale: 0.9 }], opacity: 0.72 },
   pillTabActive: { ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 }, android: { elevation: 2 } }) },
   pillTabText: { fontSize: 12, fontWeight: '700' },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },

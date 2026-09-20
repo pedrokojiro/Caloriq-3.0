@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, View, ViewStyle, StyleProp } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Animated, StyleSheet, View, ViewStyle, StyleProp } from 'react-native';
 import { useTheme } from '../hooks/useTheme';
 
 interface ProgressBarProps {
@@ -21,6 +21,23 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
 
   // Clamp progress between 0 and 1
   const clampedProgress = Math.max(0, Math.min(1, progress));
+  const [animatedProgress] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    animatedProgress.setValue(0);
+    Animated.spring(animatedProgress, {
+      toValue: clampedProgress,
+      damping: 14,
+      stiffness: 90,
+      mass: 0.8,
+      useNativeDriver: false,
+    }).start();
+  }, [animatedProgress, clampedProgress]);
+
+  const animatedWidth = animatedProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
 
   return (
     <View
@@ -33,11 +50,11 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
         style,
       ]}
     >
-      <View
+      <Animated.View
         style={[
           styles.fill,
           {
-            width: `${clampedProgress * 100}%`,
+            width: animatedWidth,
             backgroundColor: color,
           },
         ]}

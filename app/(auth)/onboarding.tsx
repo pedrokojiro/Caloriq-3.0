@@ -1,16 +1,33 @@
-import React from 'react';
-import { StyleSheet, Text, View, Dimensions } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Animated, Easing, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BaseScreen, Button, Card } from '../../src/components';
 import { useTheme } from '../../src/hooks/useTheme';
 import Svg, { Circle, Path } from 'react-native-svg';
-
-const { width } = Dimensions.get('window');
+import { AuthMotionBackground } from '../../src/components/AuthMotionBackground';
 
 export default function OnboardingScreen() {
   const router = useRouter();
-  const { colors, globalColors } = useTheme();
+  const { globalColors } = useTheme();
+  const { width, height } = useWindowDimensions();
+  const compact = height < 740 || width < 360;
+  const [heroEntrance] = useState(() => new Animated.Value(0));
+  const [contentEntrance] = useState(() => new Animated.Value(0));
+  const [logoMotion] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    Animated.stagger(140, [
+      Animated.spring(heroEntrance, { toValue: 1, damping: 14, stiffness: 105, useNativeDriver: true }),
+      Animated.spring(contentEntrance, { toValue: 1, damping: 15, stiffness: 105, useNativeDriver: true }),
+    ]).start();
+    const floating = Animated.loop(Animated.sequence([
+      Animated.timing(logoMotion, { toValue: 1, duration: 1700, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(logoMotion, { toValue: 0, duration: 1700, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ]));
+    floating.start();
+    return () => floating.stop();
+  }, [contentEntrance, heroEntrance, logoMotion]);
 
   const handleStart = () => {
     router.push('/(auth)/register' as never);
@@ -20,10 +37,18 @@ export default function OnboardingScreen() {
     <BaseScreen 
       scrollable 
       style={{ backgroundColor: '#FFFFFF' }} // Onboarding matches HTML white background
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, compact && styles.contentCompact]}
     >
+      <AuthMotionBackground />
       {/* Top Header - Status Bar styling & Logo */}
-      <View style={styles.header}>
+      <Animated.View style={[styles.header, {
+        opacity: heroEntrance,
+        transform: [{ translateY: heroEntrance.interpolate({ inputRange: [0, 1], outputRange: [-26, 0] }) }],
+      }]}>
+        <Animated.View style={{ transform: [
+          { translateY: logoMotion.interpolate({ inputRange: [0, 1], outputRange: [0, -9] }) },
+          { scale: logoMotion.interpolate({ inputRange: [0, 1], outputRange: [1, 1.045] }) },
+        ] }}>
         <LinearGradient
           colors={[globalColors.primaryGlow, globalColors.primary, globalColors.primaryDark]}
           style={styles.logoContainer}
@@ -35,6 +60,7 @@ export default function OnboardingScreen() {
             <Path d="M23 6v5M23 35v5M6 23H1M45 23h-5" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round"/>
           </Svg>
         </LinearGradient>
+        </Animated.View>
 
         <View style={styles.badge}>
           <View style={[styles.aiDot, { backgroundColor: globalColors.primary }]} />
@@ -49,9 +75,13 @@ export default function OnboardingScreen() {
         <Text style={styles.subtitle}>
           Escaneie qualquer refeição com IA.{'\n'}Veja macros em segundos.
         </Text>
-      </View>
+      </Animated.View>
 
       {/* Feature Cards Container */}
+      <Animated.View style={[styles.animatedContent, {
+        opacity: contentEntrance,
+        transform: [{ translateY: contentEntrance.interpolate({ inputRange: [0, 1], outputRange: [34, 0] }) }],
+      }]}>
       <Card style={styles.featuresCard}>
         {/* Feature 1 */}
         <View style={styles.featureItem}>
@@ -113,6 +143,7 @@ export default function OnboardingScreen() {
           variant="ghost"
         />
       </View>
+      </Animated.View>
     </BaseScreen>
   );
 }
@@ -125,7 +156,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     minHeight: '100%',
+    overflow: 'hidden',
   },
+  contentCompact: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 },
+  animatedContent: { width: '100%', alignItems: 'center' },
   header: {
     alignItems: 'center',
     marginTop: 16,

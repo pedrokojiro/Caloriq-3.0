@@ -23,6 +23,10 @@ export default function ScannerScreen() {
   const [processingStep, setProcessingStep] = useState(0);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [laserAnim] = useState(() => new Animated.Value(0));
+  const [guidePulse] = useState(() => new Animated.Value(0));
+  const [processingEntrance] = useState(() => new Animated.Value(0));
+  const [shutterScale] = useState(() => new Animated.Value(1));
+  const [shutterPulse] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     if (permission && !permission.granted && permission.canAskAgain && !permissionRequested.current) {
@@ -32,15 +36,47 @@ export default function ScannerScreen() {
   }, [permission, requestPermission]);
 
   useEffect(() => {
-    const animation = Animated.loop(
+    const laserAnimation = Animated.loop(
       Animated.sequence([
         Animated.timing(laserAnim, { toValue: 1, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
         Animated.timing(laserAnim, { toValue: 0, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
       ])
     );
-    animation.start();
-    return () => animation.stop();
-  }, [laserAnim]);
+    const pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(guidePulse, { toValue: 1, duration: 850, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(guidePulse, { toValue: 0, duration: 850, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    const shutterAnimation = Animated.loop(
+      Animated.timing(shutterPulse, {
+        toValue: 1,
+        duration: 1450,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      })
+    );
+    laserAnimation.start();
+    pulseAnimation.start();
+    shutterAnimation.start();
+    return () => {
+      laserAnimation.stop();
+      pulseAnimation.stop();
+      shutterAnimation.stop();
+    };
+  }, [guidePulse, laserAnim, shutterPulse]);
+
+  useEffect(() => {
+    if (!isProcessing) return;
+    processingEntrance.setValue(0);
+    Animated.spring(processingEntrance, {
+      toValue: 1,
+      damping: 16,
+      stiffness: 150,
+      mass: 0.8,
+      useNativeDriver: true,
+    }).start();
+  }, [isProcessing, processingEntrance]);
 
   const analyzeImage = async (uri: string, base64: string | null) => {
     setImageUri(uri);
@@ -104,7 +140,20 @@ export default function ScannerScreen() {
 
   const toggleFacing = () => setFacing(current => current === 'back' ? 'front' : 'back');
   const toggleFlash = () => setFlash(current => current === 'off' ? 'on' : 'off');
+  const animateShutter = (toValue: number) => Animated.spring(shutterScale, {
+    toValue,
+    damping: 14,
+    stiffness: 260,
+    mass: 0.6,
+    useNativeDriver: true,
+  }).start();
   const scanLineTranslate = laserAnim.interpolate({ inputRange: [0, 1], outputRange: [-105, 105] });
+  const processingLineTranslate = laserAnim.interpolate({ inputRange: [0, 1], outputRange: [-96, 96] });
+  const guideOpacity = guidePulse.interpolate({ inputRange: [0, 1], outputRange: [0.46, 1] });
+  const guideScale = guidePulse.interpolate({ inputRange: [0, 1], outputRange: [0.965, 1.025] });
+  const processingScale = processingEntrance.interpolate({ inputRange: [0, 1], outputRange: [0.78, 1] });
+  const shutterRingScale = shutterPulse.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1.34] });
+  const shutterRingOpacity = shutterPulse.interpolate({ inputRange: [0, 0.45, 1], outputRange: [0, 0.75, 0] });
 
   return (
     <BaseScreen edges={[]} style={styles.screen}>
@@ -146,16 +195,16 @@ export default function ScannerScreen() {
           )}
 
           <View pointerEvents="none" style={styles.cameraShade} />
-          <View pointerEvents="none" style={styles.guideFrame}>
+          <Animated.View pointerEvents="none" style={[styles.guideFrame, { opacity: guideOpacity, transform: [{ scale: guideScale }] }]}>
             <View style={[styles.corner, styles.cornerTL, { borderColor: globalColors.primaryGlow }]} />
             <View style={[styles.corner, styles.cornerTR, { borderColor: globalColors.primaryGlow }]} />
             <View style={[styles.corner, styles.cornerBL, { borderColor: globalColors.primaryGlow }]} />
             <View style={[styles.corner, styles.cornerBR, { borderColor: globalColors.primaryGlow }]} />
             <Animated.View style={[styles.scanLine, { backgroundColor: globalColors.primaryGlow, transform: [{ translateY: scanLineTranslate }] }]} />
-          </View>
+          </Animated.View>
 
           <View pointerEvents="none" style={styles.cameraHint}>
-            <View style={styles.aiBadge}><View style={[styles.aiDot, { backgroundColor: globalColors.primaryGlow }]} /><Text style={styles.aiBadgeText}>IA PRONTA</Text></View>
+            <View style={styles.aiBadge}><Animated.View style={[styles.aiDot, { backgroundColor: globalColors.primaryGlow, opacity: guideOpacity }]} /><Text style={styles.aiBadgeText}>IA PRONTA</Text></View>
             <Text style={styles.cameraHintTitle}>Centralize toda a refeição</Text>
             <Text style={styles.cameraHintText}>Boa iluminação melhora a identificação</Text>
           </View>
@@ -169,11 +218,28 @@ export default function ScannerScreen() {
             <Text style={styles.sideControlText}>Galeria</Text>
           </Pressable>
 
-          <Pressable onPress={() => void capturePhoto()} disabled={!permission?.granted || !cameraReady || capturing || isProcessing} style={styles.shutterOuter}>
-            <View style={[styles.shutterInner, (!cameraReady || capturing) && styles.shutterDisabled]}>
-              {capturing ? <ActivityIndicator color="#0D1117" /> : <Ionicons name="sparkles" size={23} color="#0D1117" />}
-            </View>
-          </Pressable>
+          <View style={styles.shutterWrap}>
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.shutterPulseRing,
+                { borderColor: globalColors.primaryGlow, opacity: shutterRingOpacity, transform: [{ scale: shutterRingScale }] },
+              ]}
+            />
+            <Animated.View style={{ transform: [{ scale: shutterScale }] }}>
+              <Pressable
+                onPress={() => void capturePhoto()}
+                onPressIn={() => animateShutter(0.84)}
+                onPressOut={() => animateShutter(1)}
+                disabled={!permission?.granted || !cameraReady || capturing || isProcessing}
+                style={styles.shutterOuter}
+              >
+                <View style={[styles.shutterInner, (!cameraReady || capturing) && styles.shutterDisabled]}>
+                  {capturing ? <ActivityIndicator color="#0D1117" /> : <Ionicons name="sparkles" size={23} color="#0D1117" />}
+                </View>
+              </Pressable>
+            </Animated.View>
+          </View>
 
           <Pressable onPress={toggleFacing} style={styles.sideControl} disabled={isProcessing}>
             <Ionicons name="camera-reverse-outline" size={27} color="#FFF" />
@@ -184,18 +250,19 @@ export default function ScannerScreen() {
       </View>
 
       {isProcessing ? (
-        <View style={styles.processingOverlay}>
-          <View style={styles.processingPreview}>
+        <Animated.View style={[styles.processingOverlay, { opacity: processingEntrance }]}>
+          <Animated.View style={[styles.processingPreview, { transform: [{ scale: processingScale }] }]}>
             {imageUri ? <Image source={{ uri: imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
             <View style={styles.processingDim} />
+            <Animated.View style={[styles.processingScanLine, { backgroundColor: globalColors.primaryGlow, transform: [{ translateY: processingLineTranslate }] }]} />
             <View style={styles.processingSpinner}><ActivityIndicator size="large" color="#FFF" /></View>
-          </View>
+          </Animated.View>
           <Text style={styles.processingTitle}>Analisando sua refeição</Text>
           <Text style={styles.processingText}>{processingStep === 0 ? 'Identificando alimentos…' : processingStep === 1 ? 'Calculando nutrientes…' : 'Preparando o resultado…'}</Text>
           <View style={styles.progressDots}>
             {[0, 1, 2].map(step => <View key={step} style={[styles.progressDot, processingStep >= step && { backgroundColor: globalColors.primary }]} />)}
           </View>
-        </View>
+        </Animated.View>
       ) : null}
     </BaseScreen>
   );
@@ -218,7 +285,7 @@ const styles = StyleSheet.create({
   cornerTR: { right: 0, top: 0, borderRightWidth: 4, borderTopWidth: 4, borderTopRightRadius: 18 },
   cornerBL: { left: 0, bottom: 0, borderLeftWidth: 4, borderBottomWidth: 4, borderBottomLeftRadius: 18 },
   cornerBR: { right: 0, bottom: 0, borderRightWidth: 4, borderBottomWidth: 4, borderBottomRightRadius: 18 },
-  scanLine: { height: 2, left: 10, right: 10, position: 'absolute', top: '50%', borderRadius: 2, shadowColor: '#27C76B', shadowOpacity: 0.9, shadowRadius: 10 },
+  scanLine: { height: 4, left: 8, right: 8, position: 'absolute', top: '50%', borderRadius: 3, shadowColor: '#27C76B', shadowOpacity: 1, shadowRadius: 16, elevation: 8 },
   cameraHint: { position: 'absolute', left: 20, right: 20, bottom: 20, backgroundColor: 'rgba(4,8,6,0.66)', borderRadius: 18, paddingVertical: 13, paddingHorizontal: 16, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
   aiBadge: { flexDirection: 'row', alignItems: 'center', marginBottom: 5 },
   aiDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
@@ -236,12 +303,15 @@ const styles = StyleSheet.create({
   sideControl: { width: 72, alignItems: 'center', gap: 5 },
   sideControlText: { color: '#AEB6B1', fontSize: 10, fontWeight: '700' },
   shutterOuter: { width: 82, height: 82, borderRadius: 41, borderWidth: 3, borderColor: '#FFF', padding: 6, alignItems: 'center', justifyContent: 'center' },
+  shutterWrap: { width: 100, height: 100, alignItems: 'center', justifyContent: 'center' },
+  shutterPulseRing: { position: 'absolute', width: 88, height: 88, borderRadius: 44, borderWidth: 3 },
   shutterInner: { width: '100%', height: '100%', borderRadius: 34, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center' },
   shutterDisabled: { opacity: 0.45 },
   captureLabel: { color: '#747D78', fontSize: 10, textAlign: 'center', marginTop: 10 },
   processingOverlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(5,7,6,0.96)', zIndex: 30, alignItems: 'center', justifyContent: 'center', padding: 30 },
   processingPreview: { width: 210, height: 210, borderRadius: 32, overflow: 'hidden', backgroundColor: '#151A17', marginBottom: 24 },
   processingDim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.28)' },
+  processingScanLine: { position: 'absolute', left: 12, right: 12, top: '50%', height: 2, borderRadius: 2, shadowColor: '#27C76B', shadowOpacity: 1, shadowRadius: 12, elevation: 5 },
   processingSpinner: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center' },
   processingTitle: { color: '#FFF', fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
   processingText: { color: '#9EA8A2', fontSize: 13, marginTop: 7 },

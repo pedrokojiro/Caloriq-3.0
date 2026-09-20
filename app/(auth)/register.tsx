@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, Pressable } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Animated, Easing, StyleSheet, Text, View, Pressable, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { BaseScreen, Button, Input } from '../../src/components';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAuth } from '../../src/context/AuthContext';
+import { AuthMotionBackground } from '../../src/components/AuthMotionBackground';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -18,6 +19,17 @@ export default function RegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { height } = useWindowDimensions();
+  const compact = height < 760;
+  const [headerEntrance] = useState(() => new Animated.Value(0));
+  const [formEntrance] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    Animated.stagger(120, [
+      Animated.spring(headerEntrance, { toValue: 1, damping: 14, stiffness: 115, useNativeDriver: true }),
+      Animated.timing(formEntrance, { toValue: 1, duration: 520, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    ]).start();
+  }, [formEntrance, headerEntrance]);
 
   const submit = async () => {
     if (password !== confirm) return setError('As senhas não são iguais.');
@@ -34,7 +46,9 @@ export default function RegisterScreen() {
   };
 
   return (
-    <BaseScreen scrollable style={styles.screen} contentContainerStyle={styles.content}>
+    <BaseScreen scrollable style={styles.screen} contentContainerStyle={[styles.content, compact && styles.contentCompact]}>
+      <AuthMotionBackground />
+      <Animated.View style={{ opacity: headerEntrance, transform: [{ translateY: headerEntrance.interpolate({ inputRange: [0, 1], outputRange: [-22, 0] }) }] }}>
       <View style={styles.topRow}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={22} color="#0D1117" />
@@ -46,8 +60,12 @@ export default function RegisterScreen() {
       <Text style={styles.eyebrow}>PASSO 1 DE 2</Text>
       <Text style={styles.title}>Crie sua conta</Text>
       <Text style={styles.subtitle}>Primeiro, seus dados de acesso. Depois vamos calcular metas feitas para você.</Text>
+      </Animated.View>
 
-      <View style={styles.formCard}>
+      <Animated.View style={[styles.formCard, {
+        opacity: formEntrance,
+        transform: [{ translateY: formEntrance.interpolate({ inputRange: [0, 1], outputRange: [30, 0] }) }],
+      }]}>
         <Input label="Como podemos chamar você?" value={name} onChangeText={setName} placeholder="Seu nome" autoComplete="off" importantForAutofill="no" />
         <Input label="E-mail" value={email} onChangeText={setEmail} placeholder="seu@email.com" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="off" importantForAutofill="no" />
         <Input
@@ -70,7 +88,7 @@ export default function RegisterScreen() {
           <Ionicons name="shield-checkmark-outline" size={16} color={globalColors.primary} />
           <Text style={styles.securityText}>Seus dados ficam vinculados somente à sua conta.</Text>
         </View>
-      </View>
+      </Animated.View>
 
       <Pressable onPress={() => router.replace('/(auth)/login')} style={styles.footer}>
         <Text style={styles.footerText}>Já tem uma conta? <Text style={{ color: globalColors.primary, fontWeight: '800' }}>Entrar</Text></Text>
@@ -81,7 +99,8 @@ export default function RegisterScreen() {
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: '#FFFFFF' },
-  content: { paddingHorizontal: 24, paddingTop: 22, paddingBottom: 32, flexGrow: 1 },
+  content: { paddingHorizontal: 24, paddingTop: 22, paddingBottom: 32, flexGrow: 1, overflow: 'hidden' },
+  contentCompact: { paddingTop: 14, paddingBottom: 18 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 },
   backButton: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#F4F6F8', alignItems: 'center', justifyContent: 'center' },
   logo: { width: 48, height: 48, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },

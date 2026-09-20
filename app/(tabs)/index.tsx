@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, Text, View, Pressable, Platform, ScrollView } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Animated, Easing, StyleSheet, Text, View, Pressable, Platform, ScrollView, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,9 +12,63 @@ export default function DashboardScreen() {
   const { colors, globalColors, toggleTheme, theme } = useTheme();
   const { state, addWater } = useAppState();
   const { profile, goals, meals, waterIntake } = state;
+  const { width } = useWindowDimensions();
+  const compact = width < 380;
+  const [headerEntrance] = useState(() => new Animated.Value(0));
+  const [bodyEntrance] = useState(() => new Animated.Value(0));
+  const [backgroundMotion] = useState(() => new Animated.Value(0));
+
+  const todayMeals = useMemo(() => {
+    const today = new Date();
+    return meals.filter(meal => {
+      if (!meal.consumedAt) return false;
+      const consumedAt = new Date(meal.consumedAt);
+      return !Number.isNaN(consumedAt.getTime())
+        && consumedAt.getFullYear() === today.getFullYear()
+        && consumedAt.getMonth() === today.getMonth()
+        && consumedAt.getDate() === today.getDate();
+    });
+  }, [meals]);
+
+  const weekData = useMemo(() => {
+    const formatter = new Intl.DateTimeFormat('pt-BR', { weekday: 'short' });
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date();
+      date.setHours(0, 0, 0, 0);
+      date.setDate(date.getDate() - (6 - index));
+      const nextDate = new Date(date);
+      nextDate.setDate(nextDate.getDate() + 1);
+      const calories = meals.reduce((total, meal) => {
+        const consumedAt = meal.consumedAt ? new Date(meal.consumedAt) : null;
+        return consumedAt && consumedAt >= date && consumedAt < nextDate
+          ? total + meal.calories * meal.portions
+          : total;
+      }, 0);
+      return {
+        key: date.toISOString(),
+        label: index === 6 ? 'Hoje' : formatter.format(date).replace('.', ''),
+        calories: Math.round(calories),
+        isToday: index === 6,
+      };
+    });
+  }, [meals]);
+
+  useEffect(() => {
+    const entrance = Animated.stagger(130, [
+      Animated.spring(headerEntrance, { toValue: 1, damping: 14, stiffness: 115, mass: 0.8, useNativeDriver: true }),
+      Animated.spring(bodyEntrance, { toValue: 1, damping: 15, stiffness: 105, mass: 0.8, useNativeDriver: true }),
+    ]);
+    const floatingBackground = Animated.loop(Animated.sequence([
+      Animated.timing(backgroundMotion, { toValue: 1, duration: 2800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(backgroundMotion, { toValue: 0, duration: 2800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ]));
+    entrance.start();
+    floatingBackground.start();
+    return () => floatingBackground.stop();
+  }, [backgroundMotion, bodyEntrance, headerEntrance]);
 
   // Calculate totals from meals
-  const totals = meals.reduce(
+  const totals = todayMeals.reduce(
     (acc, meal) => {
       acc.calories += meal.calories * meal.portions;
       acc.protein += meal.protein * meal.portions;
@@ -32,14 +86,27 @@ export default function DashboardScreen() {
     fat: Math.round(totals.fat),
   };
 
-  const caloriePercentage = Math.min(100, Math.round((roundedTotals.calories / goals.calories) * 100)) || 0;
+  const caloriePercentage = goals.calories > 0
+    ? Math.min(100, Math.round((roundedTotals.calories / goals.calories) * 100))
+    : 0;
   const caloriesRemaining = Math.max(0, goals.calories - roundedTotals.calories);
 
-  const proteinProgress = Math.min(1, roundedTotals.protein / goals.protein) || 0;
-  const carbsProgress = Math.min(1, roundedTotals.carbs / goals.carbs) || 0;
-  const fatProgress = Math.min(1, roundedTotals.fat / goals.fat) || 0;
+  const proteinProgress = goals.protein > 0 ? Math.min(1, roundedTotals.protein / goals.protein) : 0;
+  const carbsProgress = goals.carbs > 0 ? Math.min(1, roundedTotals.carbs / goals.carbs) : 0;
+  const fatProgress = goals.fat > 0 ? Math.min(1, roundedTotals.fat / goals.fat) : 0;
 
-  const waterProgress = Math.min(1, waterIntake / goals.water) || 0;
+  const waterProgress = goals.water > 0 ? Math.min(1, waterIntake / goals.water) : 0;
+  const weekAverage = Math.round(weekData.reduce((sum, day) => sum + day.calories, 0) / weekData.length);
+  const greeting = new Date().getHours() < 12 ? 'Bom dia,' : new Date().getHours() < 18 ? 'Boa tarde,' : 'Boa noite,';
+  const headerTranslate = headerEntrance.interpolate({ inputRange: [0, 1], outputRange: [-22, 0] });
+  const bodyTranslate = bodyEntrance.interpolate({ inputRange: [0, 1], outputRange: [34, 0] });
+  const orbTranslate = backgroundMotion.interpolate({ inputRange: [0, 1], outputRange: [-12, 14] });
+  const orbScale = backgroundMotion.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.1] });
+  const proteinInsight = todayMeals.length === 0
+    ? 'Comece registrando sua primeira refeição para receber uma análise personalizada do seu dia.'
+    : roundedTotals.protein < goals.protein
+      ? `Faltam ${Math.max(0, Math.round(goals.protein - roundedTotals.protein))}g de proteína para sua meta de hoje.`
+      : 'Meta de proteína atingida hoje. Excelente trabalho! 🎉';
 
   return (
     <BaseScreen edges={['left', 'right']}>
@@ -56,39 +123,41 @@ export default function DashboardScreen() {
           end={{ x: 1, y: 1 }}
           style={styles.greenHeader}
         >
+          <Animated.View pointerEvents="none" style={[styles.headerOrbLarge, { transform: [{ translateY: orbTranslate }, { scale: orbScale }] }]} />
+          <Animated.View pointerEvents="none" style={[styles.headerOrbSmall, { transform: [{ translateY: Animated.multiply(orbTranslate, -0.6) }] }]} />
           {/* Status bar offset */}
           <View style={styles.statusBarSpacer} />
 
           {/* User Row & Actions */}
-          <View style={styles.userRow}>
-            <View>
-              <Text style={styles.greeting}>Bom dia,</Text>
-              <Text style={styles.username}>{profile.name} 👋</Text>
+          <Animated.View style={[styles.userRow, { opacity: headerEntrance, transform: [{ translateY: headerTranslate }] }]}>
+            <View style={styles.userCopy}>
+              <Text style={styles.greeting}>{greeting}</Text>
+              <Text numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.72} style={[styles.username, compact && styles.usernameCompact]}>{profile.name} 👋</Text>
               <View style={styles.streakBadge}>
                 <Text style={styles.streakText}>🔥 {profile.streak} dias seguidos</Text>
               </View>
             </View>
 
-            <View style={styles.headerActions}>
-              <Pressable style={styles.headerIcon} onPress={toggleTheme}>
+            <View style={[styles.headerActions, compact && styles.headerActionsCompact]}>
+              <Pressable style={[styles.headerIcon, compact && styles.headerIconCompact]} onPress={toggleTheme}>
                 <Text style={{ fontSize: 16 }}>{theme === 'dark' ? '☀️' : '🌙'}</Text>
               </Pressable>
-              <Pressable style={styles.headerIcon} onPress={() => router.push('/sub-screens/notifications')}>
+              <Pressable style={[styles.headerIcon, compact && styles.headerIconCompact]} onPress={() => router.push('/sub-screens/notifications')}>
                 <Ionicons name="notifications-outline" size={18} color="#FFFFFF" />
               </Pressable>
-              <Pressable style={styles.headerIcon} onPress={() => router.push('/(tabs)/profile')}>
+              <Pressable style={[styles.headerIcon, compact && styles.headerIconCompact]} onPress={() => router.push('/(tabs)/profile')}>
                 <Ionicons name="person-outline" size={18} color="#FFFFFF" />
               </Pressable>
             </View>
-          </View>
+          </Animated.View>
 
           {/* Calorie Progress Ring Card */}
-          <View style={styles.glassCard}>
-            <View style={styles.calorieCardContent}>
+          <Animated.View style={[styles.glassCard, { opacity: headerEntrance, transform: [{ scale: headerEntrance }] }]}>
+            <View style={[styles.calorieCardContent, compact && styles.calorieCardContentCompact]}>
               <CircularProgress 
                 percentage={caloriePercentage} 
-                size={88}
-                strokeWidth={9}
+                size={compact ? 74 : 88}
+                strokeWidth={compact ? 8 : 9}
                 color="#FFFFFF"
                 trackColor="rgba(255, 255, 255, 0.15)"
                 textColor="#FFFFFF"
@@ -96,7 +165,7 @@ export default function DashboardScreen() {
               <View style={styles.calorieCardInfo}>
                 <Text style={styles.calorieLabel}>Calorias hoje</Text>
                 <View style={styles.calorieValueContainer}>
-                  <Text style={styles.calorieValue}>{roundedTotals.calories.toLocaleString('pt-BR')}</Text>
+                  <Text style={[styles.calorieValue, compact && styles.calorieValueCompact]}>{roundedTotals.calories.toLocaleString('pt-BR')}</Text>
                   <Text style={styles.calorieTarget}>/ {goals.calories} kcal</Text>
                 </View>
                 <ProgressBar
@@ -110,10 +179,10 @@ export default function DashboardScreen() {
                 </Text>
               </View>
             </View>
-          </View>
+          </Animated.View>
         </LinearGradient>
 
-        <View style={styles.bodyContent}>
+        <Animated.View style={[styles.bodyContent, { opacity: bodyEntrance, transform: [{ translateY: bodyTranslate }] }]}>
           {/* MACROS ROW */}
           <View style={styles.macrosRow}>
             {/* Protein */}
@@ -183,6 +252,21 @@ export default function DashboardScreen() {
             </View>
           </Card>
 
+          {profile.motivation ? (
+            <Pressable onPress={() => router.push('/(tabs)/goals')}>
+              <Card style={[styles.motivationCard, { borderColor: `${globalColors.primary}35` }]}>
+                <View style={[styles.motivationIcon, { backgroundColor: `${globalColors.primary}18` }]}>
+                  <Ionicons name="heart" size={19} color={globalColors.primary} />
+                </View>
+                <View style={styles.motivationCopy}>
+                  <Text style={[styles.motivationEyebrow, { color: globalColors.primary }]}>LEMBRE-SE DO SEU PORQUÊ</Text>
+                  <Text style={[styles.motivationText, { color: colors.textMain }]} numberOfLines={3}>{profile.motivation}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
+              </Card>
+            </Pressable>
+          ) : null}
+
           {/* TODAY'S MEALS SECTION */}
           <View style={styles.mealsSection}>
             <View style={styles.mealsHeader}>
@@ -192,14 +276,14 @@ export default function DashboardScreen() {
               </Pressable>
             </View>
 
-            {meals.length === 0 ? (
+            {todayMeals.length === 0 ? (
               <Card style={styles.emptyMealsCard}>
                 <Text style={[styles.emptyMealsText, { color: colors.textMuted }]}>
                   Nenhuma refeição registrada hoje.
                 </Text>
               </Card>
             ) : (
-              meals.map((meal) => (
+              todayMeals.map((meal) => (
                 <Card 
                   key={meal.id} 
                   style={[styles.mealCard, { borderColor: colors.borderColor }]}
@@ -261,7 +345,7 @@ export default function DashboardScreen() {
                 </View>
               </View>
               <Text style={[styles.insightDesc, { color: theme === 'dark' ? '#CBD0D8' : '#0F6E3A' }]}>
-                Você está 23% abaixo da meta de proteína. Considere adicionar um lanche proteico no fim do dia. 💪
+                {proteinInsight}
               </Text>
             </View>
           </Card>
@@ -276,55 +360,32 @@ export default function DashboardScreen() {
             </View>
             <Card style={[styles.chartCard, { borderColor: colors.borderColor }]}>
               <View style={styles.chartBarsContainer}>
-                {/* Seg */}
-                <View style={styles.chartBarCol}>
-                  <View style={[styles.chartBarFill, { height: 56, backgroundColor: `${globalColors.primary}40` }]} />
-                  <Text style={[styles.chartBarLabel, { color: colors.textLight }]}>Seg</Text>
-                </View>
-                {/* Ter */}
-                <View style={styles.chartBarCol}>
-                  <View style={[styles.chartBarFill, { height: 68, backgroundColor: globalColors.primary }]} />
-                  <Text style={[styles.chartBarLabel, { color: colors.textLight }]}>Ter</Text>
-                </View>
-                {/* Qua */}
-                <View style={styles.chartBarCol}>
-                  <View style={[styles.chartBarFill, { height: 48, backgroundColor: `${globalColors.primary}40` }]} />
-                  <Text style={[styles.chartBarLabel, { color: colors.textLight }]}>Qua</Text>
-                </View>
-                {/* Qui */}
-                <View style={styles.chartBarCol}>
-                  <View style={[styles.chartBarFill, { height: 62, backgroundColor: globalColors.primaryDark }]} />
-                  <Text style={[styles.chartBarLabel, { color: colors.textLight }]}>Qui</Text>
-                </View>
-                {/* Sex */}
-                <View style={styles.chartBarCol}>
-                  <View style={[styles.chartBarFill, { height: 42, backgroundColor: `${globalColors.primary}60` }]} />
-                  <Text style={[styles.chartBarLabel, { color: colors.textLight }]}>Sex</Text>
-                </View>
-                {/* Sáb */}
-                <View style={styles.chartBarCol}>
-                  <View style={[styles.chartBarFill, { height: 52, backgroundColor: globalColors.primary }]} />
-                  <Text style={[styles.chartBarLabel, { color: colors.textLight }]}>Sáb</Text>
-                </View>
-                {/* Hoje */}
-                <View style={styles.chartBarCol}>
-                  <View 
-                    style={[
-                      styles.chartBarToday, 
-                      { 
-                        height: Math.min(80, Math.max(15, (roundedTotals.calories / goals.calories) * 80)),
-                        borderColor: globalColors.primary,
-                        backgroundColor: `${globalColors.primary}10`,
-                      }
-                    ]} 
-                  />
-                  <Text style={[styles.chartBarLabelToday, { color: globalColors.primary }]}>Hoje</Text>
-                </View>
+                {weekData.map(day => {
+                  const ratio = goals.calories > 0 ? day.calories / goals.calories : 0;
+                  const height = day.calories > 0 ? Math.min(80, Math.max(10, ratio * 80)) : 4;
+                  return (
+                    <View key={day.key} style={styles.chartBarCol}>
+                      <View style={[
+                        day.isToday ? styles.chartBarToday : styles.chartBarFill,
+                        {
+                          height,
+                          borderColor: globalColors.primary,
+                          backgroundColor: day.isToday ? `${globalColors.primary}10` : globalColors.primary,
+                          opacity: day.calories > 0 ? (day.isToday ? 1 : 0.72) : 0.2,
+                        },
+                      ]} />
+                      <Text style={[
+                        day.isToday ? styles.chartBarLabelToday : styles.chartBarLabel,
+                        { color: day.isToday ? globalColors.primary : colors.textLight },
+                      ]}>{day.label}</Text>
+                    </View>
+                  );
+                })}
               </View>
               <View style={styles.chartSummary}>
                 <View style={[styles.chartSummaryDot, { backgroundColor: globalColors.primary }]} />
                 <Text style={[styles.chartSummaryText, { color: colors.textLight }]}>
-                  Média: {roundedTotals.calories} kcal · Meta: {goals.calories} kcal
+                  Média dos últimos 7 dias: {weekAverage} kcal · Meta: {goals.calories} kcal
                 </Text>
               </View>
             </Card>
@@ -332,7 +393,7 @@ export default function DashboardScreen() {
           
           {/* Scroll view safe margin at the bottom */}
           <View style={styles.bottomSpacer} />
-        </View>
+        </Animated.View>
       </ScrollView>
 
       {/* Botão Flutuante (FAB) do Chat IA */}
@@ -358,6 +419,27 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  headerOrbLarge: {
+    position: 'absolute',
+    width: 210,
+    height: 210,
+    borderRadius: 105,
+    backgroundColor: 'rgba(255,255,255,0.09)',
+    top: -82,
+    right: -72,
+  },
+  headerOrbSmall: {
+    position: 'absolute',
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    borderWidth: 18,
+    borderColor: 'rgba(255,255,255,0.07)',
+    left: -36,
+    bottom: 24,
   },
   statusBarSpacer: {
     height: Platform.OS === 'ios' ? 44 : 28,
@@ -369,6 +451,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     marginTop: 8,
   },
+  userCopy: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 10,
+  },
   greeting: {
     fontSize: 13,
     color: 'rgba(255, 255, 255, 0.72)',
@@ -379,6 +466,10 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#FFFFFF',
     letterSpacing: -0.6,
+  },
+  usernameCompact: {
+    fontSize: 22,
+    lineHeight: 26,
   },
   streakBadge: {
     marginTop: 8,
@@ -403,6 +494,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  headerActionsCompact: {
+    gap: 5,
+  },
   headerIcon: {
     width: 36,
     height: 36,
@@ -412,6 +506,11 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerIconCompact: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
   },
   glassCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.13)',
@@ -433,6 +532,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 20,
   },
+  calorieCardContentCompact: {
+    gap: 12,
+  },
   calorieCardInfo: {
     flex: 1,
   },
@@ -453,6 +555,9 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#FFFFFF',
     letterSpacing: -1,
+  },
+  calorieValueCompact: {
+    fontSize: 26,
   },
   calorieTarget: {
     fontSize: 13,
@@ -526,6 +631,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 4,
   },
+  motivationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  motivationIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  motivationCopy: { flex: 1 },
+  motivationEyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 0.8, marginBottom: 4 },
+  motivationText: { fontSize: 13, lineHeight: 18, fontWeight: '700', paddingRight: 8 },
   waterBtn: {
     width: 34,
     height: 36,
@@ -741,4 +864,3 @@ const styles = StyleSheet.create({
     zIndex: 999,
   },
 });
-
