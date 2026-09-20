@@ -111,8 +111,8 @@ export default function ProfileScreen() {
             icon="alarm-outline"
             iconColor={globalColors.protein}
             iconBg="#FFF3EC"
-            title="Lembretes de Água & Macros"
-            subtitle="Agende avisos de consumo de água"
+            title="Lembretes de Água & Refeições"
+            subtitle="Defina horários para hidratação e alimentação"
             onPress={() => router.push('/sub-screens/reminders')}
           />
           <OptionItem

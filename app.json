@@ -2,7 +2,7 @@
   "expo": {
     "name": "caloriq",
     "slug": "caloriq",
-    "version": "1.2.0",
+    "version": "1.3.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "caloriq",
@@ -12,7 +12,10 @@
     },
     "android": {
       "package": "com.pedrokojiro.caloriq",
-      "versionCode": 3,
+      "versionCode": 5,
+      "permissions": [
+        "android.permission.SCHEDULE_EXACT_ALARM"
+      ],
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -51,6 +54,13 @@
         {
           "photosPermission": "Permita que o CaloriQ acesse suas fotos para escolher uma imagem de perfil.",
           "cameraPermission": "Permita que o CaloriQ use a câmera para criar sua foto de perfil."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#20C56B",
+          "defaultChannel": "caloriq-reminders"
         }
       ]
     ],

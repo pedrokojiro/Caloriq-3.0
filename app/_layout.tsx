@@ -5,6 +5,7 @@ import { ThemeProvider } from '../src/context/ThemeContext';
 import { AppStateProvider } from '../src/context/AppStateContext';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import * as SplashScreen from 'expo-splash-screen';
+import { configureNotifications } from '../src/services/notifications';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -13,6 +14,7 @@ export default function RootLayout() {
   useEffect(() => {
     // Hide splash screen after initialization
     SplashScreen.hideAsync().catch(() => {});
+    configureNotifications().catch(error => console.warn('Não foi possível preparar as notificações.', error));
   }, []);
 
   return (

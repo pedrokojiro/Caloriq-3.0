@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { caloriqApi, type AuthUser } from '../services/api';
 import type { NutritionProfileInput } from '../utils/nutrition';
 import { clearAuthToken, readAuthToken, saveAuthToken } from '../services/auth-storage';
+import { cancelNotificationSchedule } from '../services/notifications';
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -41,7 +42,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(result.user);
     },
     logout: async () => {
-      try { await caloriqApi.logout(); } finally { await clearAuthToken(); setUser(null); }
+      try { await caloriqApi.logout(); } finally {
+        if (user?.id) await cancelNotificationSchedule(user.id).catch(() => {});
+        await clearAuthToken();
+        setUser(null);
+      }
     },
   }}>{children}</AuthContext.Provider>;
 }
