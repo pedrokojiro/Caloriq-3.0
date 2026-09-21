@@ -1,4 +1,6 @@
-# CaloriQ 3.0 — Protótipo Premium com IA Real 🥗📸
+# CaloriQ 3.0 — Nutrição inteligente com IA 🥗📸
+
+**Versão Android atual: 1.3.1 (build 5)**
 
 Para usar o backend e o banco na nuvem e gerar um APK, consulte [NUVEM_E_APK.md](NUVEM_E_APK.md). O caminho local antigo continua documentado em [APRESENTACAO.md](APRESENTACAO.md).
 
@@ -31,6 +33,31 @@ Antes de salvar a refeição no diário, a tela de ajuste permite que você edit
 *   Gráfico circular de calorias consumidas.
 *   Registro e cálculo de copos d'água consumidos durante o dia.
 
+### 5. 👤 Conta, perfil e metas personalizadas
+*   Cadastro e login persistidos pelo backend.
+*   Cálculo de TMB, gasto energético e metas de calorias e macronutrientes a partir do perfil do usuário.
+*   Edição de dados pessoais, objetivo nutricional e foto de perfil.
+*   Tela **Meu Plano** com resumo de metas, motivação pessoal e evolução visual por ângulo (frente, lado e costas).
+
+### 6. 📊 Analytics e histórico real
+*   Dados iniciam zerados e são calculados a partir das refeições registradas.
+*   Visões de 7 dias, mês e 3 meses com agrupamentos adequados a cada período.
+*   Registros diários são separados pela data: o painel do novo dia não reaproveita refeições anteriores.
+
+### 7. 🔔 Notificações e lembretes personalizados
+*   Alertas locais para diário, streak, relatório semanal e insights da IA.
+*   Lembretes de hidratação e refeições com horários definidos pelo próprio usuário.
+*   Preferências salvas por conta e agendamentos cancelados ao sair.
+*   Botão de teste que dispara uma notificação em aproximadamente 5 segundos.
+
+> No Android, as notificações nativas devem ser testadas no APK. O Expo Go pode exibir as telas, mas não executa o módulo de notificações usado pelo projeto.
+
+### 8. ☁️ Backend e banco na nuvem
+*   API Node.js/Express hospedada no Render.
+*   PostgreSQL hospedado no Supabase.
+*   Chave do Gemini mantida somente no backend, sem exposição no aplicativo.
+*   APK independente do computador de desenvolvimento e da rede local.
+
 ---
 
 ## 🛠️ Tecnologias Utilizadas
@@ -40,8 +67,12 @@ Antes de salvar a refeição no diário, a tela de ajuste permite que você edit
 *   **Estilização:** Vanilla CSS embutido com StyleSheet
 *   **Imagens:** `expo-image` (Carregamento rápido de alta performance)
 *   **Seleção de Mídia:** `expo-image-picker`
+*   **Notificações locais:** `expo-notifications`
 *   **IA de Análise & Chat:** Google Gemini API (`gemini-3.6-flash` por meio do backend protegido)
 *   **Ícones:** `@expo/vector-icons` (Ionicons)
+*   **Backend:** Node.js e Express
+*   **Banco de dados:** PostgreSQL local ou Supabase
+*   **Hospedagem da API:** Render
 
 ---
 
@@ -52,10 +83,12 @@ Antes de salvar a refeição no diário, a tela de ajuste permite que você edit
     npm install
     ```
 
-2.  **Inicie o servidor de desenvolvimento:**
+2.  **Inicie o ambiente local completo:**
     ```bash
-    npx expo start
+    npm run apresentar
     ```
+
+    Esse comando prepara a API local na porta `3333`, identifica o endereço de rede do computador e inicia o Expo.
 
 3.  **Para testar no Computador (Web):**
     *   Pressione **`w`** no terminal (ou execute `npx expo start --web`).
@@ -65,6 +98,11 @@ Antes de salvar a refeição no diário, a tela de ajuste permite que você edit
     *   Baixe o aplicativo **Expo Go** no seu celular (App Store ou Google Play Store).
     *   Escaneie o código QR gerado no terminal.
     *   *Nota:* Certifique-se de que o celular e o computador estão conectados na mesma rede Wi-Fi.
+
+5.  **Para testar notificações no Android:**
+    *   Gere ou instale um APK do perfil `preview` do EAS.
+    *   Abra **Perfil → Notificações → Testar notificação em 5 segundos**.
+    *   Autorize as notificações e minimize o aplicativo.
 
 ---
 
@@ -120,3 +158,7 @@ EXPO_PUBLIC_AI_DEMO_MODE=true
 ```
 
 Reinicie o Expo depois da alteração. A câmera e a galeria continuam funcionando, mas o resultado nutricional vem dos presets locais e nenhuma requisição é enviada ao Gemini. Com `false`, o app usa o Gemini normalmente e, na web, muda automaticamente para os dados locais se a chamada falhar.
+
+## 📦 Materiais de apresentação
+
+Os slides e roteiros finais do projeto ficam na pasta [`apresentacao/`](apresentacao/). Arquivos intermediários usados para gerar e validar os slides não são versionados.
