@@ -49,7 +49,9 @@ export const Input: React.FC<InputProps> = ({
   const reduceMotion = useReducedMotion();
   const focusStyle = useAnimatedStyle(() => ({
     borderColor: interpolateColor(focusProgress.value, [0, 1], [colors.inputBorder, globalColors.primary]),
-    backgroundColor: interpolateColor(focusProgress.value, [0, 1], [colors.inputBg, `${globalColors.primary}0A`]),
+    // Keep the opaque theme background while focused. A transparent target made
+    // white text disappear against light auth cards when the system used dark mode.
+    backgroundColor: colors.inputBg,
     transform: [{ scale: reduceMotion ? 1 : 1 + focusProgress.value * 0.005 }],
   }));
 

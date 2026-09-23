@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View, Pressable, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { BaseScreen, Button, Input } from '../../src/components';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAuth } from '../../src/context/AuthContext';
@@ -18,8 +18,8 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { height } = useWindowDimensions();
-  const compact = height < 720;
+  const { width, height } = useWindowDimensions();
+  const compact = height < 720 || width < 360;
   const [headerEntrance] = useState(() => new Animated.Value(0));
   const [formEntrance] = useState(() => new Animated.Value(0));
   const reduceMotion = useReducedMotion();
@@ -52,13 +52,14 @@ export default function LoginScreen() {
   return (
     <BaseScreen scrollable style={styles.screen} contentContainerStyle={[styles.content, compact && styles.contentCompact]}>
       <AuthMotionBackground />
+      <View style={[styles.authPanel, width >= 600 && styles.authPanelWide]}>
       <Animated.View style={[styles.header, {
         opacity: headerEntrance,
         transform: [{ translateY: headerEntrance.interpolate({ inputRange: [0, 1], outputRange: [-24, 0] }) }],
       }]}>
-        <LinearGradient colors={[globalColors.primaryGlow, globalColors.primaryDark]} style={styles.logo}>
-          <Text style={styles.logoText}>Q</Text>
-        </LinearGradient>
+        <View style={styles.logo}>
+          <Image source={require('../../assets/images/caloriq-logo.png')} style={styles.logoImage} contentFit="contain" />
+        </View>
         <View style={styles.brandRow}>
           <View style={[styles.brandDot, { backgroundColor: globalColors.primary }]} />
           <Text style={[styles.brand, { color: globalColors.primary }]}>CALORIQ</Text>
@@ -107,17 +108,20 @@ export default function LoginScreen() {
         <Text style={styles.footerText}>Ainda não tem conta? <Text style={{ color: globalColors.primary, fontWeight: '800' }}>Criar agora</Text></Text>
       </Pressable>
       </Animated.View>
+      </View>
     </BaseScreen>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: '#FFFFFF' },
-  content: { paddingHorizontal: 24, paddingVertical: 30, flexGrow: 1, justifyContent: 'center', overflow: 'hidden' },
-  contentCompact: { paddingTop: 20, paddingBottom: 18 },
-  header: { marginBottom: 28 },
-  logo: { width: 58, height: 58, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 18, elevation: 5, shadowColor: '#1AAF5D', shadowOpacity: 0.25, shadowRadius: 14 },
-  logoText: { color: '#FFF', fontSize: 28, fontWeight: '900' },
+  content: { paddingHorizontal: 24, paddingVertical: 24, flexGrow: 1, justifyContent: 'center', overflow: 'hidden' },
+  contentCompact: { paddingTop: 14, paddingBottom: 14, justifyContent: 'flex-start' },
+  authPanel: { width: '100%', alignSelf: 'center' },
+  authPanelWide: { maxWidth: 440 },
+  header: { marginBottom: 22 },
+  logo: { width: 74, height: 74, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 14, backgroundColor: 'rgba(232,250,240,0.88)', elevation: 3, shadowColor: '#1AAF5D', shadowOpacity: 0.18, shadowRadius: 12 },
+  logoImage: { width: 62, height: 62 },
   brandRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   brandDot: { width: 7, height: 7, borderRadius: 4, marginRight: 7 },
   brand: { fontSize: 12, fontWeight: '900', letterSpacing: 1.4 },

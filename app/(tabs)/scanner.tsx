@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Easing, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CameraView, type CameraType, type FlashMode, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
@@ -10,10 +10,17 @@ import { useTheme } from '../../src/hooks/useTheme';
 import { analyzeMealImage, GeminiServiceError } from '../../src/services/gemini';
 import { useReducedMotion } from 'react-native-reanimated';
 import { triggerHaptic } from '../../src/utils/haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ScannerScreen() {
   const router = useRouter();
   const { globalColors } = useTheme();
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const compact = height < 720 || width < 360;
+  const topBarHeight = insets.top + (compact ? 56 : 64);
+  const controlsReserve = (compact ? 184 : 206) + Math.max(insets.bottom, 8);
+  const stageHeight = Math.max(280, Math.min(width * 1.34, height - topBarHeight - controlsReserve));
   const cameraRef = useRef<CameraView>(null);
   const permissionRequested = useRef(false);
   const [permission, requestPermission] = useCameraPermissions();
@@ -155,8 +162,19 @@ export default function ScannerScreen() {
     }
   };
 
-  const toggleFacing = () => { void triggerHaptic('selection'); setFacing(current => current === 'back' ? 'front' : 'back'); };
-  const toggleFlash = () => { void triggerHaptic('selection'); setFlash(current => current === 'off' ? 'on' : 'off'); };
+  const toggleFacing = () => {
+    void triggerHaptic('selection');
+    setFlash('off');
+    setFacing(current => current === 'back' ? 'front' : 'back');
+  };
+  const toggleFlash = () => {
+    if (facing === 'front') {
+      Alert.alert('Flash indisponível', 'Use a câmera traseira para ativar a iluminação contínua.');
+      return;
+    }
+    void triggerHaptic('selection');
+    setFlash(current => current === 'off' ? 'on' : 'off');
+  };
   const animateShutter = (toValue: number) => Animated.spring(shutterScale, {
     toValue,
     damping: 14,
@@ -174,7 +192,7 @@ export default function ScannerScreen() {
 
   return (
     <BaseScreen edges={[]} style={styles.screen}>
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, { height: topBarHeight, paddingTop: insets.top + 6 }]}>
         <Pressable onPress={() => router.replace('/(tabs)')} style={styles.topButton}>
           <Ionicons name="close" size={26} color="#FFF" />
         </Pressable>
@@ -187,14 +205,15 @@ export default function ScannerScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.stageShell}>
-        <View style={styles.cameraStage}>
+      <View style={[styles.stageShell, { paddingHorizontal: compact ? 10 : 14 }]}>
+        <View style={[styles.cameraStage, { height: stageHeight, maxWidth: Math.min(width - (compact ? 20 : 28), 560) }]}>
           {permission?.granted ? (
             <CameraView
               ref={cameraRef}
               style={StyleSheet.absoluteFill}
               facing={facing}
               flash={flash}
+              enableTorch={flash === 'on' && facing === 'back'}
               mode="picture"
               mirror={facing === 'front'}
               onCameraReady={() => setCameraReady(true)}
@@ -229,7 +248,7 @@ export default function ScannerScreen() {
         </View>
       </View>
 
-      <View style={styles.controls}>
+      <View style={[styles.controls, { paddingTop: compact ? 7 : 12, paddingBottom: 78 + Math.max(insets.bottom, 10) }]}>
         <View style={styles.controlsRow}>
           <Pressable onPress={() => void pickImage()} style={styles.sideControl} disabled={isProcessing}>
             <Ionicons name="images-outline" size={25} color="#FFF" />
@@ -288,14 +307,14 @@ export default function ScannerScreen() {
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: '#050706' },
-  topBar: { height: Platform.OS === 'ios' ? 108 : 94, paddingTop: Platform.OS === 'ios' ? 48 : 34, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  topBar: { paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   topButton: { width: 46, height: 46, borderRadius: 16, backgroundColor: '#171B19', borderWidth: 1, borderColor: '#303632', alignItems: 'center', justifyContent: 'center' },
   topButtonActive: { backgroundColor: '#2B2714', borderColor: '#5C5120' },
   titleArea: { alignItems: 'center' },
   title: { color: '#FFF', fontSize: 18, fontWeight: '900', letterSpacing: -0.4 },
   subtitle: { color: '#8E9792', fontSize: 10, marginTop: 3 },
-  stageShell: { flex: 1, paddingHorizontal: 14, paddingVertical: 8 },
-  cameraStage: { flex: 1, minHeight: 390, borderRadius: 30, overflow: 'hidden', backgroundColor: '#111512', borderWidth: 1, borderColor: '#252B27', position: 'relative' },
+  stageShell: { flex: 1, paddingVertical: 6, alignItems: 'center', justifyContent: 'center' },
+  cameraStage: { width: '100%', borderRadius: 30, overflow: 'hidden', backgroundColor: '#111512', borderWidth: 1, borderColor: '#252B27', position: 'relative' },
   cameraShade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,0.08)' },
   guideFrame: { position: 'absolute', left: '12%', right: '12%', top: '18%', bottom: '27%', justifyContent: 'center' },
   corner: { position: 'absolute', width: 42, height: 42, borderWidth: 0 },
@@ -316,7 +335,7 @@ const styles = StyleSheet.create({
   permissionText: { color: '#9AA39E', fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 7, marginBottom: 18 },
   permissionButton: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14 },
   permissionButtonText: { color: '#FFF', fontSize: 13, fontWeight: '800' },
-  controls: { paddingHorizontal: 26, paddingTop: 14, paddingBottom: Platform.OS === 'ios' ? 108 : 100 },
+  controls: { paddingHorizontal: 26 },
   controlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
   sideControl: { width: 72, alignItems: 'center', gap: 5 },
   sideControlText: { color: '#AEB6B1', fontSize: 10, fontWeight: '700' },

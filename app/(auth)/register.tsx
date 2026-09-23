@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View, Pressable, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { BaseScreen, Button, Input } from '../../src/components';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAuth } from '../../src/context/AuthContext';
@@ -60,9 +60,9 @@ export default function RegisterScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={22} color="#0D1117" />
         </Pressable>
-        <LinearGradient colors={[globalColors.primaryGlow, globalColors.primaryDark]} style={styles.logo}>
-          <Text style={styles.logoText}>Q</Text>
-        </LinearGradient>
+        <View style={styles.logo}>
+          <Image source={require('../../assets/images/caloriq-logo.png')} style={styles.logoImage} contentFit="contain" />
+        </View>
       </View>
       <Text style={styles.eyebrow}>PASSO 1 DE 2</Text>
       <Text style={styles.title}>Crie sua conta</Text>
@@ -110,8 +110,8 @@ const styles = StyleSheet.create({
   contentCompact: { paddingTop: 14, paddingBottom: 18 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 },
   backButton: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#F4F6F8', alignItems: 'center', justifyContent: 'center' },
-  logo: { width: 48, height: 48, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  logoText: { color: '#FFF', fontSize: 23, fontWeight: '900' },
+  logo: { width: 54, height: 54, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EDFBF3' },
+  logoImage: { width: 46, height: 46 },
   eyebrow: { color: '#1AAF5D', fontSize: 12, fontWeight: '900', letterSpacing: 1.2, marginBottom: 10 },
   title: { fontSize: 31, fontWeight: '900', color: '#0D1117', letterSpacing: -0.9, marginBottom: 8 },
   subtitle: { fontSize: 15, lineHeight: 22, color: '#6B7585', marginBottom: 24, maxWidth: 350 },

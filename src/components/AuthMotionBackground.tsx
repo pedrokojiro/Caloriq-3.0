@@ -3,7 +3,10 @@ import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { cancelAnimation, Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
 export function AuthMotionBackground() {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+  const primarySize = Math.min(340, Math.max(220, width * 0.72));
+  const secondarySize = Math.min(104, Math.max(72, width * 0.23));
+  const ringSize = Math.min(132, Math.max(92, width * 0.28));
   const drift = useSharedValue(0);
   const reduceMotion = useReducedMotion();
 
@@ -27,9 +30,9 @@ export function AuthMotionBackground() {
 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <Animated.View style={[styles.primaryOrb, { width: width * 0.7, height: width * 0.7, borderRadius: width }, primaryMotion]} />
-      <Animated.View style={[styles.secondaryOrb, secondaryMotion]} />
-      <Animated.View style={[styles.ring, primaryMotion]} />
+      <Animated.View style={[styles.primaryOrb, { width: primarySize, height: primarySize, borderRadius: primarySize / 2, top: -primarySize * 0.42, right: -primarySize * 0.2 }, primaryMotion]} />
+      <Animated.View style={[styles.secondaryOrb, { width: secondarySize, height: secondarySize, borderRadius: secondarySize / 2, top: Math.min(height * 0.24, 190), left: -secondarySize * 0.48 }, secondaryMotion]} />
+      <Animated.View style={[styles.ring, { width: ringSize, height: ringSize, borderRadius: ringSize / 2, top: primarySize * 0.08, right: -ringSize * 0.46 }, primaryMotion]} />
     </View>
   );
 }
@@ -37,27 +40,15 @@ export function AuthMotionBackground() {
 const styles = StyleSheet.create({
   primaryOrb: {
     position: 'absolute',
-    top: -155,
-    right: -105,
     backgroundColor: '#E8FAF0',
   },
   secondaryOrb: {
     position: 'absolute',
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    top: 118,
-    left: -46,
     backgroundColor: '#F2FBF6',
   },
   ring: {
     position: 'absolute',
-    width: 118,
-    height: 118,
-    borderRadius: 59,
     borderWidth: 18,
     borderColor: 'rgba(39,199,107,0.07)',
-    bottom: 36,
-    right: -64,
   },
 });

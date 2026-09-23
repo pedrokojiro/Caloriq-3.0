@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { BaseScreen, Button, Card } from '../../src/components';
 import { useTheme } from '../../src/hooks/useTheme';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { AuthMotionBackground } from '../../src/components/AuthMotionBackground';
 import { useReducedMotion } from 'react-native-reanimated';
 
@@ -57,17 +57,9 @@ export default function OnboardingScreen() {
           { translateY: logoMotion.interpolate({ inputRange: [0, 1], outputRange: [0, -9] }) },
           { scale: logoMotion.interpolate({ inputRange: [0, 1], outputRange: [1, 1.045] }) },
         ] }}>
-        <LinearGradient
-          colors={[globalColors.primaryGlow, globalColors.primary, globalColors.primaryDark]}
-          style={styles.logoContainer}
-        >
-          <Svg width={46} height={46} viewBox="0 0 46 46" fill="none">
-            <Path d="M23 6C13.6 6 6 13.6 6 23s7.6 17 17 17 17-7.6 17-17S32.4 6 23 6z" fill="rgba(255,255,255,0.15)"/>
-            <Path d="M23 12c-6.1 0-11 4.9-11 11s4.9 11 11 11 11-4.9 11-11-4.9-11-11-11zm0 17a6 6 0 110-12 6 6 0 010 12z" fill="#fff"/>
-            <Circle cx="23" cy="23" r="3.5" fill="#fff"/>
-            <Path d="M23 6v5M23 35v5M6 23H1M45 23h-5" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round"/>
-          </Svg>
-        </LinearGradient>
+        <View style={styles.logoContainer}>
+          <Image source={require('../../assets/images/caloriq-logo.png')} style={styles.logoImage} contentFit="contain" />
+        </View>
         </Animated.View>
 
         <View style={styles.badge}>
@@ -186,7 +178,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 28,
     elevation: 8,
+    backgroundColor: '#EDFBF3',
   },
+  logoImage: { width: 76, height: 76 },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
