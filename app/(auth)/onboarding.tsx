@@ -6,6 +6,7 @@ import { BaseScreen, Button, Card } from '../../src/components';
 import { useTheme } from '../../src/hooks/useTheme';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { AuthMotionBackground } from '../../src/components/AuthMotionBackground';
+import { useReducedMotion } from 'react-native-reanimated';
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -15,8 +16,15 @@ export default function OnboardingScreen() {
   const [heroEntrance] = useState(() => new Animated.Value(0));
   const [contentEntrance] = useState(() => new Animated.Value(0));
   const [logoMotion] = useState(() => new Animated.Value(0));
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reduceMotion) {
+      heroEntrance.setValue(1);
+      contentEntrance.setValue(1);
+      logoMotion.setValue(0);
+      return;
+    }
     Animated.stagger(140, [
       Animated.spring(heroEntrance, { toValue: 1, damping: 14, stiffness: 105, useNativeDriver: true }),
       Animated.spring(contentEntrance, { toValue: 1, damping: 15, stiffness: 105, useNativeDriver: true }),
@@ -27,7 +35,7 @@ export default function OnboardingScreen() {
     ]));
     floating.start();
     return () => floating.stop();
-  }, [contentEntrance, heroEntrance, logoMotion]);
+  }, [contentEntrance, heroEntrance, logoMotion, reduceMotion]);
 
   const handleStart = () => {
     router.push('/(auth)/register' as never);
@@ -130,6 +138,7 @@ export default function OnboardingScreen() {
           title="Começar agora" 
           onPress={handleStart}
           variant="primary"
+          haptic="light"
           style={styles.ctaButton}
           icon={
             <Svg width="18" height="18" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" viewBox="0 0 24 24">
@@ -141,6 +150,7 @@ export default function OnboardingScreen() {
           title="Já tenho uma conta" 
           onPress={() => router.push('/(auth)/login')}
           variant="ghost"
+          haptic="selection"
         />
       </View>
       </Animated.View>

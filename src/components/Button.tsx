@@ -1,7 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, Pressable, ActivityIndicator, ViewStyle, TextStyle, View, StyleProp } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeIn, FadeOut, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useTheme } from '../hooks/useTheme';
+import { motion } from '../theme/motion';
+import { HapticFeedback, triggerHaptic } from '../utils/haptics';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface ButtonProps {
   title: string;
@@ -12,6 +17,7 @@ interface ButtonProps {
   disabled?: boolean;
   loading?: boolean;
   icon?: React.ReactNode;
+  haptic?: HapticFeedback | false;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -23,8 +29,32 @@ export const Button: React.FC<ButtonProps> = ({
   disabled = false,
   loading = false,
   icon,
+  haptic = false,
 }) => {
   const { colors, globalColors } = useTheme();
+  const reduceMotion = useReducedMotion();
+  const pressed = useSharedValue(0);
+  const enabled = !disabled && !loading;
+
+  useEffect(() => {
+    if (!enabled) pressed.set(0);
+  }, [enabled, pressed]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: withTiming(enabled ? (pressed.value ? 0.93 : 1) : 0.5, { duration: motion.duration.fast }),
+    transform: [{
+      scale: reduceMotion
+        ? 1
+        : withSpring(pressed.value ? motion.scale.buttonPressed : 1, motion.spring.button),
+    }],
+  }));
+
+  const onPressIn = () => { pressed.set(1); };
+  const onPressOut = () => { pressed.set(0); };
+  const handlePress = () => {
+    if (haptic) void triggerHaptic(haptic);
+    onPress();
+  };
 
   const getContainerStyles = (): ViewStyle => {
     switch (variant) {
@@ -71,29 +101,27 @@ export const Button: React.FC<ButtonProps> = ({
 
   const renderContent = () => {
     if (loading) {
-      return <ActivityIndicator color={getTextColor()} size="small" />;
+      return <Animated.View key="loading" entering={FadeIn.duration(motion.duration.fast)} exiting={FadeOut.duration(motion.duration.instant)}><ActivityIndicator color={getTextColor()} size="small" /></Animated.View>;
     }
 
     return (
-      <View style={styles.content}>
+      <Animated.View key="content" entering={FadeIn.duration(motion.duration.fast)} exiting={FadeOut.duration(motion.duration.instant)} style={styles.content}>
         {icon && <View style={styles.iconContainer}>{icon}</View>}
         <Text style={[styles.text, { color: getTextColor() }, textStyle]}>
           {title}
         </Text>
-      </View>
+      </Animated.View>
     );
   };
 
   if (variant === 'primary' && !disabled) {
     return (
-      <Pressable
-        onPress={onPress}
+      <AnimatedPressable
+        onPress={handlePress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
         disabled={disabled || loading}
-        style={({ pressed }) => [
-          styles.container,
-          pressed && styles.pressed,
-          style,
-        ]}
+        style={[styles.container, animatedStyle, style]}
       >
         <LinearGradient
           colors={[globalColors.primaryGlow, globalColors.primary, globalColors.primaryDark]}
@@ -103,24 +131,20 @@ export const Button: React.FC<ButtonProps> = ({
         >
           {renderContent()}
         </LinearGradient>
-      </Pressable>
+      </AnimatedPressable>
     );
   }
 
   return (
-    <Pressable
-      onPress={onPress}
+    <AnimatedPressable
+      onPress={handlePress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       disabled={disabled || loading}
-      style={({ pressed }) => [
-        styles.container,
-        getContainerStyles(),
-        disabled && { opacity: 0.5 },
-        pressed && styles.pressed,
-        style,
-      ]}
+      style={[styles.container, getContainerStyles(), animatedStyle, style]}
     >
       {renderContent()}
-    </Pressable>
+    </AnimatedPressable>
   );
 };
 
@@ -138,10 +162,6 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  pressed: {
-    transform: [{ scale: 0.98 }],
-    opacity: 0.9,
   },
   content: {
     flexDirection: 'row',

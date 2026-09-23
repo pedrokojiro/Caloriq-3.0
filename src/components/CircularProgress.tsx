@@ -1,6 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { Animated, Easing, View, Text, StyleSheet } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
+import { AnimatedNumber } from './AnimatedNumber';
+import { motion } from '../theme/motion';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -27,23 +30,32 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const center = size / 2;
-  const [progress] = useState(() => new Animated.Value(0));
-  const strokeDashoffset = progress.interpolate({ inputRange: [0, 100], outputRange: [circumference, 0] });
+  const progress = useSharedValue(clampedPercentage);
+  const milestoneScale = useSharedValue(1);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
-    Animated.timing(progress, {
-      toValue: clampedPercentage,
-      duration: 850,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
-  }, [clampedPercentage, progress]);
+    progress.value = reduceMotion
+      ? clampedPercentage
+      : withTiming(clampedPercentage, { duration: motion.duration.count, easing: Easing.out(Easing.cubic) });
+    if (!reduceMotion && clampedPercentage >= 100) {
+      milestoneScale.value = withSequence(
+        withSpring(1.06, motion.spring.success),
+        withSpring(1, motion.spring.success),
+      );
+    }
+  }, [clampedPercentage, milestoneScale, progress, reduceMotion]);
+
+  const animatedCircleProps = useAnimatedProps(() => ({
+    strokeDashoffset: circumference * (1 - progress.value / 100),
+  }));
+  const containerMotion = useAnimatedStyle(() => ({ transform: [{ scale: milestoneScale.value }] }));
 
   return (
-    <View style={[styles.container, { width: size, height: size }]}>
+    <Animated.View style={[styles.container, { width: size, height: size }, containerMotion]}>
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         {/* Background track circle */}
-        <AnimatedCircle
+        <Circle
           cx={center}
           cy={center}
           r={radius}
@@ -52,7 +64,7 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
           strokeWidth={strokeWidth}
         />
         {/* Animated/filled progress circle */}
-        <Circle
+        <AnimatedCircle
           cx={center}
           cy={center}
           r={radius}
@@ -60,17 +72,15 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
           stroke={color}
           strokeWidth={strokeWidth}
           strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset as unknown as number}
+          animatedProps={animatedCircleProps}
           strokeLinecap="round"
           transform={`rotate(-90 ${center} ${center})`}
         />
       </Svg>
       <View style={styles.textContainer}>
-        <Text style={[styles.text, { color: textColor }]}>
-          {Math.round(clampedPercentage)}%
-        </Text>
+        <AnimatedNumber value={clampedPercentage} suffix="%" style={[styles.text, { color: textColor }]} duration={motion.duration.count} />
       </View>
-    </View>
+    </Animated.View>
   );
 };
 

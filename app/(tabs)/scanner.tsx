@@ -8,6 +8,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { BaseScreen } from '../../src/components';
 import { useTheme } from '../../src/hooks/useTheme';
 import { analyzeMealImage, GeminiServiceError } from '../../src/services/gemini';
+import { useReducedMotion } from 'react-native-reanimated';
+import { triggerHaptic } from '../../src/utils/haptics';
 
 export default function ScannerScreen() {
   const router = useRouter();
@@ -27,13 +29,21 @@ export default function ScannerScreen() {
   const [processingEntrance] = useState(() => new Animated.Value(0));
   const [shutterScale] = useState(() => new Animated.Value(1));
   const [shutterPulse] = useState(() => new Animated.Value(0));
+  const [captureFlash] = useState(() => new Animated.Value(0));
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reduceMotion) {
+      laserAnim.setValue(0.5);
+      guidePulse.setValue(0.5);
+      shutterPulse.setValue(0);
+      return;
+    }
     if (permission && !permission.granted && permission.canAskAgain && !permissionRequested.current) {
       permissionRequested.current = true;
       void requestPermission();
     }
-  }, [permission, requestPermission]);
+  }, [guidePulse, laserAnim, permission, reduceMotion, requestPermission, shutterPulse]);
 
   useEffect(() => {
     const laserAnimation = Animated.loop(
@@ -64,7 +74,7 @@ export default function ScannerScreen() {
       pulseAnimation.stop();
       shutterAnimation.stop();
     };
-  }, [guidePulse, laserAnim, shutterPulse]);
+  }, [guidePulse, laserAnim, reduceMotion, shutterPulse]);
 
   useEffect(() => {
     if (!isProcessing) return;
@@ -86,6 +96,7 @@ export default function ScannerScreen() {
       setTimeout(() => setProcessingStep(1), 450);
       const analysisResult = await analyzeMealImage(uri, base64, 'refeição fotografada');
       setProcessingStep(2);
+      void triggerHaptic('success');
       setTimeout(() => {
         setIsProcessing(false);
         setImageUri(null);
@@ -113,6 +124,11 @@ export default function ScannerScreen() {
 
   const capturePhoto = async () => {
     if (!cameraRef.current || !cameraReady || capturing || isProcessing) return;
+    void triggerHaptic('medium');
+    if (!reduceMotion) {
+      captureFlash.setValue(0.38);
+      Animated.timing(captureFlash, { toValue: 0, duration: 190, useNativeDriver: true }).start();
+    }
     setCapturing(true);
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.55, base64: true, shutterSound: true });
@@ -133,13 +149,14 @@ export default function ScannerScreen() {
       base64: true,
     });
     if (!result.canceled && result.assets[0]) {
+      void triggerHaptic('selection');
       const asset = result.assets[0];
       await analyzeImage(asset.uri, asset.base64 || null);
     }
   };
 
-  const toggleFacing = () => setFacing(current => current === 'back' ? 'front' : 'back');
-  const toggleFlash = () => setFlash(current => current === 'off' ? 'on' : 'off');
+  const toggleFacing = () => { void triggerHaptic('selection'); setFacing(current => current === 'back' ? 'front' : 'back'); };
+  const toggleFlash = () => { void triggerHaptic('selection'); setFlash(current => current === 'off' ? 'on' : 'off'); };
   const animateShutter = (toValue: number) => Animated.spring(shutterScale, {
     toValue,
     damping: 14,
@@ -195,6 +212,7 @@ export default function ScannerScreen() {
           )}
 
           <View pointerEvents="none" style={styles.cameraShade} />
+          <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.captureFlash, { opacity: captureFlash }]} />
           <Animated.View pointerEvents="none" style={[styles.guideFrame, { opacity: guideOpacity, transform: [{ scale: guideScale }] }]}>
             <View style={[styles.corner, styles.cornerTL, { borderColor: globalColors.primaryGlow }]} />
             <View style={[styles.corner, styles.cornerTR, { borderColor: globalColors.primaryGlow }]} />
@@ -315,6 +333,7 @@ const styles = StyleSheet.create({
   processingSpinner: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center' },
   processingTitle: { color: '#FFF', fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
   processingText: { color: '#9EA8A2', fontSize: 13, marginTop: 7 },
+  captureFlash: { backgroundColor: '#FFFFFF', zIndex: 12 },
   progressDots: { flexDirection: 'row', gap: 7, marginTop: 20 },
   progressDot: { width: 24, height: 5, borderRadius: 3, backgroundColor: '#2D332F' },
 });

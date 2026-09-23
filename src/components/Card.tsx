@@ -1,6 +1,10 @@
 import React from 'react';
 import { StyleSheet, Pressable, View, ViewStyle, StyleProp } from 'react-native';
+import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useTheme } from '../hooks/useTheme';
+import { motion } from '../theme/motion';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface CardProps {
   children: React.ReactNode;
@@ -16,6 +20,16 @@ export const Card: React.FC<CardProps> = ({
   onPress,
 }) => {
   const { colors } = useTheme();
+  const reduceMotion = useReducedMotion();
+  const pressed = useSharedValue(0);
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: withTiming(pressed.value ? 0.96 : 1, { duration: motion.duration.fast }),
+    transform: [{
+      scale: reduceMotion
+        ? 1
+        : withSpring(pressed.value ? motion.scale.cardPressed : 1, motion.spring.card),
+    }],
+  }));
 
   const cardStyle: ViewStyle = {
     backgroundColor: colors.bgCard,
@@ -36,18 +50,14 @@ export const Card: React.FC<CardProps> = ({
 
   if (onPress) {
     return (
-      <Pressable
+      <AnimatedPressable
         onPress={onPress}
-        style={({ pressed }) => [
-          styles.container,
-          cardStyle,
-          shadowStyle,
-          pressed && styles.pressed,
-          style,
-        ]}
+        onPressIn={() => { pressed.value = 1; }}
+        onPressOut={() => { pressed.value = 0; }}
+        style={[styles.container, cardStyle, shadowStyle, animatedStyle, style]}
       >
         {children}
-      </Pressable>
+      </AnimatedPressable>
     );
   }
 
@@ -61,10 +71,6 @@ export const Card: React.FC<CardProps> = ({
 const styles = StyleSheet.create({
   container: {
     overflow: 'hidden',
-  },
-  pressed: {
-    transform: [{ scale: 0.98 }],
-    opacity: 0.95,
   },
 });
 export default Card;

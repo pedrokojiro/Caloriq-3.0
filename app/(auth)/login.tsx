@@ -7,6 +7,7 @@ import { BaseScreen, Button, Input } from '../../src/components';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAuth } from '../../src/context/AuthContext';
 import { AuthMotionBackground } from '../../src/components/AuthMotionBackground';
+import { useReducedMotion } from 'react-native-reanimated';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -21,13 +22,19 @@ export default function LoginScreen() {
   const compact = height < 720;
   const [headerEntrance] = useState(() => new Animated.Value(0));
   const [formEntrance] = useState(() => new Animated.Value(0));
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reduceMotion) {
+      headerEntrance.setValue(1);
+      formEntrance.setValue(1);
+      return;
+    }
     Animated.stagger(130, [
       Animated.spring(headerEntrance, { toValue: 1, damping: 14, stiffness: 110, useNativeDriver: true }),
       Animated.timing(formEntrance, { toValue: 1, duration: 520, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
     ]).start();
-  }, [formEntrance, headerEntrance]);
+  }, [formEntrance, headerEntrance, reduceMotion]);
 
   const handleLogin = async () => {
     setError('');
@@ -92,7 +99,7 @@ export default function LoginScreen() {
           onRightIconPress={() => setShowPassword(value => !value)}
         />
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        <Button title="Entrar na minha conta" onPress={handleLogin} loading={loading} disabled={!email.trim() || !password} style={styles.button} />
+        <Button title="Entrar na minha conta" onPress={handleLogin} loading={loading} disabled={!email.trim() || !password} style={styles.button} haptic="medium" />
       </Animated.View>
 
       <Animated.View style={{ opacity: formEntrance }}>

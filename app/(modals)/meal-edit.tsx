@@ -6,6 +6,7 @@ import { useAppState } from '../../src/hooks/useAppState';
 import { BaseScreen, Button, Card, Input } from '../../src/components';
 import { Ionicons } from '@expo/vector-icons';
 import { MealItem, MealType } from '../../src/types';
+import { triggerHaptic } from '../../src/utils/haptics';
 
 function editableMealData(
   existingMeal: ReturnType<typeof useAppState>['state']['meals'][number] | undefined,
@@ -160,6 +161,8 @@ export default function MealEditModal() {
       addMeal(updatedMealData);
       Alert.alert('Sucesso', 'Refeição registrada com sucesso!');
     }
+
+    void triggerHaptic('success');
 
     router.dismissAll();
     router.replace('/(tabs)');

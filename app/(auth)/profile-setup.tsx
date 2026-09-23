@@ -167,7 +167,7 @@ export default function ProfileSetupScreen() {
       )}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Button title={user.onboardingCompleted ? 'Recalcular e salvar' : 'Criar minhas metas'} onPress={save} loading={loading} disabled={!isValid} style={styles.saveButton} />
+      <Button title={user.onboardingCompleted ? 'Recalcular e salvar' : 'Criar minhas metas'} onPress={save} loading={loading} disabled={!isValid} style={styles.saveButton} haptic="medium" />
       <Text style={styles.disclaimer}>Essas metas são estimativas para acompanhamento geral e não substituem orientação de nutricionista ou médico.</Text>
     </BaseScreen>
   );

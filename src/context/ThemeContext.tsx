@@ -67,6 +67,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     if (systemScheme === 'dark' || systemScheme === 'light') {
+      // Keep the current behavior: follow a system theme change immediately.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTheme(systemScheme);
     }
   }, [systemScheme]);

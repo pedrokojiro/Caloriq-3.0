@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { BaseScreen, Card, ProgressBar } from '../../src/components';
+import { Animated as RNAnimated, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Reanimated, { FadeInUp, LinearTransition, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withSpring, withTiming } from 'react-native-reanimated';
+import { BaseScreen, Card, ProgressBar, AnimatedNumber } from '../../src/components';
 import { useAppState } from '../../src/hooks/useAppState';
 import { useTheme } from '../../src/hooks/useTheme';
 import type { Meal } from '../../src/types';
+import { motion } from '../../src/theme/motion';
+import { triggerHaptic } from '../../src/utils/haptics';
 
 type Period = 'week' | 'month' | 'threeMonths';
 type Totals = { calories: number; protein: number; carbs: number; fat: number };
@@ -17,6 +20,36 @@ const addDays = (date: Date, amount: number) => new Date(date.getFullYear(), dat
 const dateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 const round = (value: number) => Math.round(value);
 const format = (value: number) => round(value).toLocaleString('pt-BR');
+
+function PeriodTab({ label, selected, onPress, activeColor, inactiveColor, backgroundColor }: { label: string; selected: boolean; onPress: () => void; activeColor: string; inactiveColor: string; backgroundColor: string }) {
+  const active = useSharedValue(selected ? 1 : 0);
+  const reduceMotion = useReducedMotion();
+  useEffect(() => {
+    active.value = reduceMotion ? (selected ? 1 : 0) : withSpring(selected ? 1 : 0, motion.spring.tab);
+  }, [active, reduceMotion, selected]);
+  const selectionStyle = useAnimatedStyle(() => ({
+    opacity: active.value,
+    transform: [{ scale: 0.9 + active.value * 0.1 }],
+  }));
+  return (
+    <Pressable onPress={() => { if (!selected) void triggerHaptic('selection'); onPress(); }} style={styles.pillTab}>
+      <Reanimated.View style={[styles.absoluteFill, styles.pillTabActive, { backgroundColor }, selectionStyle]} />
+      <Text style={[styles.pillTabText, { color: selected ? activeColor : inactiveColor }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function AnimatedBar({ percentage, index, color, trackColor }: { percentage: number; index: number; color: string; trackColor: string }) {
+  const height = useSharedValue(0);
+  const reduceMotion = useReducedMotion();
+  useEffect(() => {
+    height.value = reduceMotion
+      ? percentage
+      : withDelay(index * motion.stagger.short, withTiming(percentage, { duration: motion.duration.slow }));
+  }, [height, index, percentage, reduceMotion]);
+  const heightStyle = useAnimatedStyle(() => ({ height: `${height.value}%` }));
+  return <View style={[styles.barTrack, { backgroundColor: trackColor }]}><Reanimated.View style={[styles.barFill, { backgroundColor: color }, heightStyle]} /></View>;
+}
 
 function isGoalReached(calories: number, target: number) {
   return target > 0 && calories >= target * 0.9 && calories <= target * 1.1;
@@ -130,7 +163,8 @@ export default function AnalyticsScreen() {
   const { colors, globalColors } = useTheme();
   const { state } = useAppState();
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('week');
-  const [periodAnimation] = useState(() => new Animated.Value(0));
+  const [periodAnimation] = useState(() => new RNAnimated.Value(0));
+  const reduceMotion = useReducedMotion();
   const dailyMap = useMemo(() => buildDailyTotals(state.meals), [state.meals]);
   const analytics = useMemo(() => periodData(selectedPeriod, dailyMap, state.goals.calories), [dailyMap, selectedPeriod, state.goals.calories]);
   const streak = useMemo(() => currentStreak(dailyMap, new Date()), [dailyMap]);
@@ -144,14 +178,14 @@ export default function AnalyticsScreen() {
   const progress = (value: number, goal: number) => goal > 0 ? Math.min(value / goal, 1) : 0;
 
   useEffect(() => {
-    periodAnimation.setValue(0);
-    Animated.timing(periodAnimation, {
+    periodAnimation.setValue(reduceMotion ? 1 : 0);
+    RNAnimated.timing(periodAnimation, {
       toValue: 1,
-      duration: 820,
-      easing: Easing.out(Easing.back(1.15)),
-      useNativeDriver: false,
+      duration: reduceMotion ? 0 : motion.duration.slow,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
     }).start();
-  }, [periodAnimation, selectedPeriod, state.meals.length]);
+  }, [periodAnimation, reduceMotion, selectedPeriod, state.meals.length]);
 
   const contentTranslateY = periodAnimation.interpolate({ inputRange: [0, 1], outputRange: [26, 0] });
   const contentScale = periodAnimation.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] });
@@ -166,15 +200,13 @@ export default function AnalyticsScreen() {
             ['month', 'Mês'],
             ['threeMonths', '3 meses'],
           ] as const).map(([value, label]) => (
-            <Pressable key={value} onPress={() => setSelectedPeriod(value)} style={({ pressed }) => [styles.pillTab, pressed && styles.pillTabPressed, selectedPeriod === value && [styles.pillTabActive, { backgroundColor: colors.bgCard }]]}>
-              <Text style={[styles.pillTabText, { color: selectedPeriod === value ? colors.textMain : colors.textLight }]}>{label}</Text>
-            </Pressable>
+            <PeriodTab key={value} label={label} selected={selectedPeriod === value} onPress={() => setSelectedPeriod(value)} activeColor={colors.textMain} inactiveColor={colors.textLight} backgroundColor={colors.bgCard} />
           ))}
         </View>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.bgApp }]} showsVerticalScrollIndicator={false}>
-        <Animated.View style={{ opacity: periodAnimation, transform: [{ translateY: contentTranslateY }, { scale: contentScale }] }}>
+        <RNAnimated.View style={{ opacity: periodAnimation, transform: [{ translateY: contentTranslateY }, { scale: contentScale }] }}>
         <View style={styles.statsGrid}>
           <Card style={styles.statCard}>
             <View style={styles.statCardHeader}>
@@ -185,7 +217,7 @@ export default function AnalyticsScreen() {
                 </View>
               ) : null}
             </View>
-            <Text style={[styles.statCardValue, { color: colors.textMain }]}>{format(analytics.averages.calories)}</Text>
+            <AnimatedNumber value={analytics.averages.calories} style={[styles.statCardValue, { color: colors.textMain }]} />
             <Text style={[styles.statCardSub, { color: colors.textLight }]}>kcal / dia registrado</Text>
           </Card>
 
@@ -204,14 +236,14 @@ export default function AnalyticsScreen() {
 
           <Card style={styles.statCard}>
             <Text style={[styles.statCardLabel, { color: colors.textLight, marginBottom: 8 }]}>Proteína méd.</Text>
-            <Text style={[styles.statCardValue, { color: globalColors.protein }]}>{format(analytics.averages.protein)}g</Text>
+            <AnimatedNumber value={analytics.averages.protein} suffix="g" style={[styles.statCardValue, { color: globalColors.protein }]} />
             <Text style={[styles.statCardSub, { color: colors.textLight }]}>meta: {format(state.goals.protein)}g</Text>
             <ProgressBar progress={progress(analytics.averages.protein, state.goals.protein)} color={globalColors.protein} style={{ marginTop: 8 }} />
           </Card>
 
           <Card style={styles.statCard}>
             <Text style={[styles.statCardLabel, { color: colors.textLight, marginBottom: 8 }]}>Streak atual</Text>
-            <Text style={[styles.statCardValue, { color: colors.textMain }]}>{streak} 🔥</Text>
+            <View style={styles.inlineMetric}><AnimatedNumber value={streak} style={[styles.statCardValue, { color: colors.textMain }]} /><Text style={[styles.statCardValue, { color: colors.textMain }]}> 🔥</Text></View>
             <Text style={[styles.statCardSub, { color: colors.textLight }]}>dias registrados</Text>
           </Card>
         </View>
@@ -235,21 +267,8 @@ export default function AnalyticsScreen() {
               {analytics.points.map((point, index) => {
                 const heightPercentage = point.calories > 0 ? Math.max(4, Math.min(100, (point.calories / chartScale) * 100)) : 0;
                 return (
-                  <View key={`${point.label}-${index}`} style={styles.barCol}>
-                    <View style={[styles.barTrack, { backgroundColor: colors.inputBorder }]}>
-                      <Animated.View
-                        style={[
-                          styles.barFill,
-                          {
-                            height: periodAnimation.interpolate({
-                              inputRange: [0, Math.min(0.55, 0.001 + (index * 0.075)), 1],
-                              outputRange: ['0%', '0%', `${heightPercentage}%`],
-                            }),
-                            backgroundColor: point.goalReached ? globalColors.primary : point.calories > 0 ? globalColors.water : 'transparent',
-                          },
-                        ]}
-                      />
-                    </View>
+                  <View key={`bar-${index}`} style={styles.barCol}>
+                    <AnimatedBar percentage={heightPercentage} index={index} trackColor={colors.inputBorder} color={point.goalReached ? globalColors.primary : point.calories > 0 ? globalColors.water : 'transparent'} />
                     <Text style={[styles.barLabel, { color: colors.textLight }]}>{point.label}</Text>
                   </View>
                 );
@@ -277,10 +296,11 @@ export default function AnalyticsScreen() {
               <Text style={[styles.emptyTitle, { color: colors.textMain }]}>Tudo começa do zero</Text>
               <Text style={[styles.emptyDescription, { color: colors.textLight }]}>Nenhum dado artificial foi incluído. Suas refeições reais formarão este relatório.</Text>
             </Card>
-          ) : recentDays.map(day => {
+          ) : recentDays.map((day, index) => {
             const reached = isGoalReached(day.calories, state.goals.calories);
             return (
-              <Card key={day.key} style={[styles.historyItem, { borderColor: colors.borderColor }]}>
+              <Reanimated.View key={day.key} entering={FadeInUp.delay(index * motion.stagger.short).duration(motion.duration.normal)} layout={LinearTransition.duration(motion.duration.normal)}>
+              <Card style={[styles.historyItem, { borderColor: colors.borderColor }]}>
                 <View style={styles.historyRow}>
                   <View style={styles.historyCopy}>
                     <Text style={[styles.historyDay, { color: colors.textMain }]}>{day.date.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}</Text>
@@ -292,11 +312,12 @@ export default function AnalyticsScreen() {
                   </View>
                 </View>
               </Card>
+              </Reanimated.View>
             );
           })}
         </View>
         <View style={styles.bottomSpacer} />
-        </Animated.View>
+        </RNAnimated.View>
       </ScrollView>
     </BaseScreen>
   );
@@ -315,14 +336,14 @@ function MacroProgress({ name, value, goal, color, textColor }: { name: string; 
 }
 
 const styles = StyleSheet.create({
+  absoluteFill: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   scroll: { flex: 1 },
   scrollContent: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 16 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, ...Platform.select({ ios: { paddingTop: 48 } }) },
   headerTitle: { fontSize: 24, fontWeight: '900', letterSpacing: -0.6 },
   pillTabs: { flexDirection: 'row', borderRadius: 12, borderWidth: 1, padding: 3 },
   pillTab: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8 },
-  pillTabPressed: { transform: [{ scale: 0.9 }], opacity: 0.72 },
-  pillTabActive: { ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 }, android: { elevation: 2 } }) },
+  pillTabActive: { borderRadius: 8, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 }, android: { elevation: 2 } }) },
   pillTabText: { fontSize: 12, fontWeight: '700' },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
   statCard: { width: '48.5%', padding: 16 },
@@ -331,6 +352,7 @@ const styles = StyleSheet.create({
   trendBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 100 },
   trendText: { fontSize: 10, fontWeight: '700' },
   statCardValue: { fontSize: 28, fontWeight: '900', letterSpacing: -0.8 },
+  inlineMetric: { flexDirection: 'row', alignItems: 'baseline' },
   statCardSub: { fontSize: 11 },
   squaresRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, marginTop: 8 },
   squareDot: { width: 14, height: 14, borderRadius: 4 },

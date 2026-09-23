@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/static-components -- Local row depends on live theme values from this screen. */
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, Switch, Platform, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';

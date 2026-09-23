@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, View, ViewStyle, TextStyle, Pressable, KeyboardTypeOptions, StyleProp, TextInputProps } from 'react-native';
+import Animated, { interpolateColor, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useTheme } from '../hooks/useTheme';
+import { motion } from '../theme/motion';
 
 interface InputProps {
   label?: string;
@@ -18,6 +20,8 @@ interface InputProps {
   autoComplete?: TextInputProps['autoComplete'];
   textContentType?: TextInputProps['textContentType'];
   importantForAutofill?: TextInputProps['importantForAutofill'];
+  onFocus?: TextInputProps['onFocus'];
+  onBlur?: TextInputProps['onBlur'];
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -36,21 +40,37 @@ export const Input: React.FC<InputProps> = ({
   autoComplete,
   textContentType,
   importantForAutofill,
+  onFocus,
+  onBlur,
 }) => {
-  const { colors } = useTheme();
+  const { colors, globalColors } = useTheme();
+  const [focused, setFocused] = useState(false);
+  const focusProgress = useSharedValue(0);
+  const reduceMotion = useReducedMotion();
+  const focusStyle = useAnimatedStyle(() => ({
+    borderColor: interpolateColor(focusProgress.value, [0, 1], [colors.inputBorder, globalColors.primary]),
+    backgroundColor: interpolateColor(focusProgress.value, [0, 1], [colors.inputBg, `${globalColors.primary}0A`]),
+    transform: [{ scale: reduceMotion ? 1 : 1 + focusProgress.value * 0.005 }],
+  }));
+
+  const updateFocus = (next: boolean) => {
+    setFocused(next);
+    focusProgress.set(withTiming(next ? 1 : 0, { duration: motion.duration.normal }));
+  };
 
   return (
     <View style={[styles.container, style]}>
       {label && (
-        <Text style={[styles.label, { color: colors.textMuted }]}>{label}</Text>
+        <Text style={[styles.label, { color: focused ? globalColors.primary : colors.textMuted }]}>{label}</Text>
       )}
-      <View
+      <Animated.View
         style={[
           styles.inputWrapper,
           {
             backgroundColor: colors.inputBg,
             borderColor: colors.inputBorder,
           },
+          focusStyle,
         ]}
       >
         <TextInput
@@ -67,6 +87,8 @@ export const Input: React.FC<InputProps> = ({
           importantForAutofill={importantForAutofill}
           underlineColorAndroid="transparent"
           disableFullscreenUI
+          onFocus={event => { updateFocus(true); onFocus?.(event); }}
+          onBlur={event => { updateFocus(false); onBlur?.(event); }}
           style={[styles.input, { color: colors.textMain }, inputStyle]}
         />
         {rightIcon && (
@@ -74,7 +96,7 @@ export const Input: React.FC<InputProps> = ({
             {rightIcon}
           </Pressable>
         )}
-      </View>
+      </Animated.View>
     </View>
   );
 };

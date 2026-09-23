@@ -7,6 +7,7 @@ import { BaseScreen, Card, Button } from '../../src/components';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
+import { triggerHaptic } from '../../src/utils/haptics';
 
 export default function MealResultModal() {
   const router = useRouter();
@@ -67,6 +68,7 @@ export default function MealResultModal() {
   const handleSave = () => {
     // Add the meal to the global state history
     addMeal(mealData);
+    void triggerHaptic('success');
     // Go back to the dashboard index
     router.dismissAll();
     router.replace('/(tabs)');

@@ -1,11 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Animated, Easing, StyleSheet, Text, View, Pressable, Platform, ScrollView, useWindowDimensions } from 'react-native';
+import { Animated as RNAnimated, Easing, StyleSheet, Text, View, Pressable, Platform, ScrollView, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppState } from '../../src/hooks/useAppState';
 import { useTheme } from '../../src/hooks/useTheme';
-import { BaseScreen, Card, ProgressBar, CircularProgress } from '../../src/components';
+import Reanimated, { FadeInUp, LinearTransition, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withSpring } from 'react-native-reanimated';
+import { BaseScreen, Card, ProgressBar, CircularProgress, AnimatedNumber } from '../../src/components';
+import { motion } from '../../src/theme/motion';
+import { triggerHaptic } from '../../src/utils/haptics';
+
+const AnimatedPressable = Reanimated.createAnimatedComponent(Pressable);
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -14,9 +19,12 @@ export default function DashboardScreen() {
   const { profile, goals, meals, waterIntake } = state;
   const { width } = useWindowDimensions();
   const compact = width < 380;
-  const [headerEntrance] = useState(() => new Animated.Value(0));
-  const [bodyEntrance] = useState(() => new Animated.Value(0));
-  const [backgroundMotion] = useState(() => new Animated.Value(0));
+  const [headerEntrance] = useState(() => new RNAnimated.Value(0));
+  const [bodyEntrance] = useState(() => new RNAnimated.Value(0));
+  const [backgroundMotion] = useState(() => new RNAnimated.Value(0));
+  const waterBounce = useSharedValue(1);
+  const fabPressed = useSharedValue(0);
+  const reduceMotion = useReducedMotion();
 
   const todayMeals = useMemo(() => {
     const today = new Date();
@@ -54,13 +62,13 @@ export default function DashboardScreen() {
   }, [meals]);
 
   useEffect(() => {
-    const entrance = Animated.stagger(130, [
-      Animated.spring(headerEntrance, { toValue: 1, damping: 14, stiffness: 115, mass: 0.8, useNativeDriver: true }),
-      Animated.spring(bodyEntrance, { toValue: 1, damping: 15, stiffness: 105, mass: 0.8, useNativeDriver: true }),
+    const entrance = RNAnimated.stagger(130, [
+      RNAnimated.spring(headerEntrance, { toValue: 1, damping: 14, stiffness: 115, mass: 0.8, useNativeDriver: true }),
+      RNAnimated.spring(bodyEntrance, { toValue: 1, damping: 15, stiffness: 105, mass: 0.8, useNativeDriver: true }),
     ]);
-    const floatingBackground = Animated.loop(Animated.sequence([
-      Animated.timing(backgroundMotion, { toValue: 1, duration: 2800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(backgroundMotion, { toValue: 0, duration: 2800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    const floatingBackground = RNAnimated.loop(RNAnimated.sequence([
+      RNAnimated.timing(backgroundMotion, { toValue: 1, duration: 2800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      RNAnimated.timing(backgroundMotion, { toValue: 0, duration: 2800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
     ]));
     entrance.start();
     floatingBackground.start();
@@ -108,6 +116,21 @@ export default function DashboardScreen() {
       ? `Faltam ${Math.max(0, Math.round(goals.protein - roundedTotals.protein))}g de proteína para sua meta de hoje.`
       : 'Meta de proteína atingida hoje. Excelente trabalho! 🎉';
 
+  const waterIconMotion = useAnimatedStyle(() => ({ transform: [{ scale: waterBounce.value }] }));
+  const fabMotion = useAnimatedStyle(() => ({
+    transform: [{ scale: reduceMotion ? 1 : withSpring(fabPressed.value ? 0.92 : 1, motion.spring.button) }],
+  }));
+  const changeWater = (amount: number) => {
+    void triggerHaptic('light');
+    if (!reduceMotion) {
+      waterBounce.set(withSequence(
+        withSpring(1.15, motion.spring.success),
+        withSpring(1, motion.spring.success),
+      ));
+    }
+    addWater(amount);
+  };
+
   return (
     <BaseScreen edges={['left', 'right']}>
       {/* ScrollView with customized padding bottom to accommodate navigation bar */}
@@ -123,13 +146,13 @@ export default function DashboardScreen() {
           end={{ x: 1, y: 1 }}
           style={styles.greenHeader}
         >
-          <Animated.View pointerEvents="none" style={[styles.headerOrbLarge, { transform: [{ translateY: orbTranslate }, { scale: orbScale }] }]} />
-          <Animated.View pointerEvents="none" style={[styles.headerOrbSmall, { transform: [{ translateY: Animated.multiply(orbTranslate, -0.6) }] }]} />
+          <RNAnimated.View pointerEvents="none" style={[styles.headerOrbLarge, { transform: [{ translateY: orbTranslate }, { scale: orbScale }] }]} />
+          <RNAnimated.View pointerEvents="none" style={[styles.headerOrbSmall, { transform: [{ translateY: RNAnimated.multiply(orbTranslate, -0.6) }] }]} />
           {/* Status bar offset */}
           <View style={styles.statusBarSpacer} />
 
           {/* User Row & Actions */}
-          <Animated.View style={[styles.userRow, { opacity: headerEntrance, transform: [{ translateY: headerTranslate }] }]}>
+          <RNAnimated.View style={[styles.userRow, { opacity: headerEntrance, transform: [{ translateY: headerTranslate }] }]}>
             <View style={styles.userCopy}>
               <Text style={styles.greeting}>{greeting}</Text>
               <Text numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.72} style={[styles.username, compact && styles.usernameCompact]}>{profile.name} 👋</Text>
@@ -149,10 +172,10 @@ export default function DashboardScreen() {
                 <Ionicons name="person-outline" size={18} color="#FFFFFF" />
               </Pressable>
             </View>
-          </Animated.View>
+          </RNAnimated.View>
 
           {/* Calorie Progress Ring Card */}
-          <Animated.View style={[styles.glassCard, { opacity: headerEntrance, transform: [{ scale: headerEntrance }] }]}>
+          <RNAnimated.View style={[styles.glassCard, { opacity: headerEntrance, transform: [{ scale: headerEntrance }] }]}>
             <View style={[styles.calorieCardContent, compact && styles.calorieCardContentCompact]}>
               <CircularProgress 
                 percentage={caloriePercentage} 
@@ -165,7 +188,7 @@ export default function DashboardScreen() {
               <View style={styles.calorieCardInfo}>
                 <Text style={styles.calorieLabel}>Calorias hoje</Text>
                 <View style={styles.calorieValueContainer}>
-                  <Text style={[styles.calorieValue, compact && styles.calorieValueCompact]}>{roundedTotals.calories.toLocaleString('pt-BR')}</Text>
+                  <AnimatedNumber value={roundedTotals.calories} style={[styles.calorieValue, compact && styles.calorieValueCompact]} />
                   <Text style={styles.calorieTarget}>/ {goals.calories} kcal</Text>
                 </View>
                 <ProgressBar
@@ -179,15 +202,15 @@ export default function DashboardScreen() {
                 </Text>
               </View>
             </View>
-          </Animated.View>
+          </RNAnimated.View>
         </LinearGradient>
 
-        <Animated.View style={[styles.bodyContent, { opacity: bodyEntrance, transform: [{ translateY: bodyTranslate }] }]}>
+        <RNAnimated.View style={[styles.bodyContent, { opacity: bodyEntrance, transform: [{ translateY: bodyTranslate }] }]}>
           {/* MACROS ROW */}
           <View style={styles.macrosRow}>
             {/* Protein */}
             <Card style={styles.macroPill}>
-              <Text style={[styles.macroValue, { color: globalColors.protein }]}>{roundedTotals.protein}g</Text>
+              <AnimatedNumber value={roundedTotals.protein} suffix="g" style={[styles.macroValue, { color: globalColors.protein }]} />
               <Text style={[styles.macroLabel, { color: colors.textMuted }]}>Proteína</Text>
               <ProgressBar
                 progress={proteinProgress}
@@ -198,7 +221,7 @@ export default function DashboardScreen() {
 
             {/* Carbs */}
             <Card style={styles.macroPill}>
-              <Text style={[styles.macroValue, { color: globalColors.carbs }]}>{roundedTotals.carbs}g</Text>
+              <AnimatedNumber value={roundedTotals.carbs} suffix="g" style={[styles.macroValue, { color: globalColors.carbs }]} />
               <Text style={[styles.macroLabel, { color: colors.textMuted }]}>Carboidrato</Text>
               <ProgressBar
                 progress={carbsProgress}
@@ -209,7 +232,7 @@ export default function DashboardScreen() {
 
             {/* Fat */}
             <Card style={styles.macroPill}>
-              <Text style={[styles.macroValue, { color: globalColors.fat }]}>{roundedTotals.fat}g</Text>
+              <AnimatedNumber value={roundedTotals.fat} suffix="g" style={[styles.macroValue, { color: globalColors.fat }]} />
               <Text style={[styles.macroLabel, { color: colors.textMuted }]}>Gordura</Text>
               <ProgressBar
                 progress={fatProgress}
@@ -221,15 +244,13 @@ export default function DashboardScreen() {
 
           {/* HYDRATION TRACKER */}
           <Card style={[styles.waterCard, { borderColor: colors.borderColor }]}>
-            <View style={[styles.waterIconContainer, { backgroundColor: '#EEF4FF' }]}>
+            <Reanimated.View style={[styles.waterIconContainer, { backgroundColor: '#EEF4FF' }, waterIconMotion]}>
               <Text style={{ fontSize: 20 }}>💧</Text>
-            </View>
+            </Reanimated.View>
             <View style={styles.waterInfo}>
               <View style={styles.waterHeaderRow}>
                 <Text style={[styles.waterTitle, { color: colors.textMain }]}>Hidratação</Text>
-                <Text style={[styles.waterValueText, { color: globalColors.water }]}>
-                  {(waterIntake / 1000).toFixed(1)} / {(goals.water / 1000).toFixed(1)}L
-                </Text>
+                <View style={styles.waterAnimatedValue}><AnimatedNumber value={waterIntake / 1000} decimals={1} style={[styles.waterValueText, { color: globalColors.water }]} /><Text style={[styles.waterValueText, { color: globalColors.water }]}> / {(goals.water / 1000).toFixed(1)}L</Text></View>
               </View>
               <ProgressBar
                 progress={waterProgress}
@@ -238,13 +259,13 @@ export default function DashboardScreen() {
             </View>
             <View style={styles.waterControls}>
               <Pressable 
-                onPress={() => addWater(-250)}
+                onPress={() => changeWater(-250)}
                 style={[styles.waterBtn, { backgroundColor: '#EEF4FF' }]}
               >
                 <Text style={[styles.waterBtnText, { color: globalColors.water }]}>−</Text>
               </Pressable>
               <Pressable 
-                onPress={() => addWater(250)}
+                onPress={() => changeWater(250)}
                 style={[styles.waterBtn, { backgroundColor: '#EEF4FF' }]}
               >
                 <Text style={[styles.waterBtnText, { color: globalColors.water }]}>+</Text>
@@ -283,9 +304,9 @@ export default function DashboardScreen() {
                 </Text>
               </Card>
             ) : (
-              todayMeals.map((meal) => (
-                <Card 
-                  key={meal.id} 
+              todayMeals.map((meal, index) => (
+                <Reanimated.View key={meal.id} entering={FadeInUp.delay(index * motion.stagger.short).duration(motion.duration.normal)} layout={LinearTransition.duration(motion.duration.normal)}>
+                <Card
                   style={[styles.mealCard, { borderColor: colors.borderColor }]}
                   onPress={() => router.push({
                     pathname: '/(modals)/meal-edit',
@@ -313,6 +334,7 @@ export default function DashboardScreen() {
                     </View>
                   </View>
                 </Card>
+                </Reanimated.View>
               ))
             )}
 
@@ -393,16 +415,18 @@ export default function DashboardScreen() {
           
           {/* Scroll view safe margin at the bottom */}
           <View style={styles.bottomSpacer} />
-        </Animated.View>
+        </RNAnimated.View>
       </ScrollView>
 
       {/* Botão Flutuante (FAB) do Chat IA */}
-      <Pressable 
-        style={[styles.fab, { backgroundColor: globalColors.primary }]}
-        onPress={() => router.push('/(modals)/ai-chat')}
+      <AnimatedPressable
+        style={[styles.fab, { backgroundColor: globalColors.primary }, fabMotion]}
+        onPressIn={() => { fabPressed.value = 1; }}
+        onPressOut={() => { fabPressed.value = 0; }}
+        onPress={() => { void triggerHaptic('medium'); router.push('/(modals)/ai-chat'); }}
       >
         <Ionicons name="chatbubbles" size={24} color="#FFFFFF" />
-      </Pressable>
+      </AnimatedPressable>
     </BaseScreen>
   );
 }
@@ -626,6 +650,10 @@ const styles = StyleSheet.create({
   waterValueText: {
     fontSize: 13,
     fontWeight: '700',
+  },
+  waterAnimatedValue: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
   },
   waterControls: {
     flexDirection: 'row',

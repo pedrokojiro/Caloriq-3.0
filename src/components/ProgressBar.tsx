@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { Animated, StyleSheet, View, ViewStyle, StyleProp } from 'react-native';
+import React, { useEffect } from 'react';
+import { StyleSheet, View, ViewStyle, StyleProp } from 'react-native';
+import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useTheme } from '../hooks/useTheme';
+import { motion } from '../theme/motion';
 
 interface ProgressBarProps {
   progress: number; // 0 to 1
@@ -21,23 +23,16 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
 
   // Clamp progress between 0 and 1
   const clampedProgress = Math.max(0, Math.min(1, progress));
-  const [animatedProgress] = useState(() => new Animated.Value(0));
+  const animatedProgress = useSharedValue(clampedProgress);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
-    animatedProgress.setValue(0);
-    Animated.spring(animatedProgress, {
-      toValue: clampedProgress,
-      damping: 14,
-      stiffness: 90,
-      mass: 0.8,
-      useNativeDriver: false,
-    }).start();
-  }, [animatedProgress, clampedProgress]);
+    animatedProgress.value = reduceMotion
+      ? clampedProgress
+      : withTiming(clampedProgress, { duration: motion.duration.slow, easing: Easing.out(Easing.cubic) });
+  }, [animatedProgress, clampedProgress, reduceMotion]);
 
-  const animatedWidth = animatedProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', '100%'],
-  });
+  const fillStyle = useAnimatedStyle(() => ({ width: `${animatedProgress.value * 100}%` }));
 
   return (
     <View
@@ -54,9 +49,9 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
         style={[
           styles.fill,
           {
-            width: animatedWidth,
             backgroundColor: color,
           },
+          fillStyle,
         ]}
       />
     </View>

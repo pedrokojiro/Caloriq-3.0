@@ -7,6 +7,7 @@ import { BaseScreen, Button, Input } from '../../src/components';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAuth } from '../../src/context/AuthContext';
 import { AuthMotionBackground } from '../../src/components/AuthMotionBackground';
+import { useReducedMotion } from 'react-native-reanimated';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -23,13 +24,19 @@ export default function RegisterScreen() {
   const compact = height < 760;
   const [headerEntrance] = useState(() => new Animated.Value(0));
   const [formEntrance] = useState(() => new Animated.Value(0));
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reduceMotion) {
+      headerEntrance.setValue(1);
+      formEntrance.setValue(1);
+      return;
+    }
     Animated.stagger(120, [
       Animated.spring(headerEntrance, { toValue: 1, damping: 14, stiffness: 115, useNativeDriver: true }),
       Animated.timing(formEntrance, { toValue: 1, duration: 520, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
     ]).start();
-  }, [formEntrance, headerEntrance]);
+  }, [formEntrance, headerEntrance, reduceMotion]);
 
   const submit = async () => {
     if (password !== confirm) return setError('As senhas não são iguais.');
@@ -83,7 +90,7 @@ export default function RegisterScreen() {
         />
         <Input label="Confirmar senha" value={confirm} onChangeText={setConfirm} placeholder="Digite novamente" secureTextEntry={!showPassword} autoCapitalize="none" autoCorrect={false} autoComplete="off" importantForAutofill="no" />
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        <Button title="Continuar para minhas metas" onPress={submit} loading={loading} disabled={!name.trim() || !email.trim() || password.length < 8 || !confirm} style={styles.button} />
+        <Button title="Continuar para minhas metas" onPress={submit} loading={loading} disabled={!name.trim() || !email.trim() || password.length < 8 || !confirm} style={styles.button} haptic="medium" />
         <View style={styles.securityRow}>
           <Ionicons name="shield-checkmark-outline" size={16} color={globalColors.primary} />
           <Text style={styles.securityText}>Seus dados ficam vinculados somente à sua conta.</Text>

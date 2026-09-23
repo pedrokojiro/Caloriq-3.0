@@ -1,28 +1,35 @@
-import React, { useEffect, useState } from 'react';
-import { Animated, Easing, StyleSheet, useWindowDimensions, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import Animated, { cancelAnimation, Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
 export function AuthMotionBackground() {
   const { width } = useWindowDimensions();
-  const [motion] = useState(() => new Animated.Value(0));
+  const drift = useSharedValue(0);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
-    const animation = Animated.loop(Animated.sequence([
-      Animated.timing(motion, { toValue: 1, duration: 3600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(motion, { toValue: 0, duration: 3600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-    ]));
-    animation.start();
-    return () => animation.stop();
-  }, [motion]);
+    if (reduceMotion) {
+      drift.value = 0.5;
+      return;
+    }
+    drift.value = withRepeat(
+      withTiming(1, { duration: 3600, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    );
+    return () => cancelAnimation(drift);
+  }, [drift, reduceMotion]);
 
-  const drift = motion.interpolate({ inputRange: [0, 1], outputRange: [-10, 18] });
-  const reverseDrift = motion.interpolate({ inputRange: [0, 1], outputRange: [12, -14] });
-  const scale = motion.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.08] });
+  const primaryMotion = useAnimatedStyle(() => ({
+    transform: [{ translateY: -10 + drift.value * 28 }, { scale: 0.94 + drift.value * 0.14 }],
+  }));
+  const secondaryMotion = useAnimatedStyle(() => ({ transform: [{ translateY: 12 - drift.value * 26 }] }));
 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <Animated.View style={[styles.primaryOrb, { width: width * 0.7, height: width * 0.7, borderRadius: width, transform: [{ translateY: drift }, { scale }] }]} />
-      <Animated.View style={[styles.secondaryOrb, { transform: [{ translateY: reverseDrift }] }]} />
-      <Animated.View style={[styles.ring, { transform: [{ translateY: drift }, { scale }] }]} />
+      <Animated.View style={[styles.primaryOrb, { width: width * 0.7, height: width * 0.7, borderRadius: width }, primaryMotion]} />
+      <Animated.View style={[styles.secondaryOrb, secondaryMotion]} />
+      <Animated.View style={[styles.ring, primaryMotion]} />
     </View>
   );
 }

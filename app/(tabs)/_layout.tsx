@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Redirect, Tabs } from 'expo-router';
 import { ActivityIndicator, StyleSheet, Text, View, Pressable, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,6 +6,67 @@ import { useTheme } from '../../src/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../src/context/AuthContext';
+import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import { motion } from '../../src/theme/motion';
+import { triggerHaptic } from '../../src/utils/haptics';
+
+type TabVisual = { icon: string; label: string; isScanner: boolean };
+
+function TabItem({ item, focused, onPress, primary, muted }: { item: TabVisual; focused: boolean; onPress: () => void; primary: string; muted: string }) {
+  const active = useSharedValue(focused ? 1 : 0);
+  const reduceMotion = useReducedMotion();
+  useEffect(() => {
+    active.value = reduceMotion ? (focused ? 1 : 0) : withSpring(focused ? 1 : 0, motion.spring.tab);
+  }, [active, focused, reduceMotion]);
+  const iconMotion = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: reduceMotion ? 0 : -3 * active.value },
+      { scale: reduceMotion ? 1 : 1 + 0.08 * active.value },
+    ],
+  }));
+  const indicatorMotion = useAnimatedStyle(() => ({
+    opacity: withTiming(active.value, { duration: motion.duration.fast }),
+    transform: [{ scale: 0.82 + active.value * 0.18 }],
+  }));
+  return (
+    <Pressable onPress={() => { if (!focused) void triggerHaptic('selection'); onPress(); }} style={styles.tabItem}>
+      <Animated.View style={[styles.activeIndicator, { backgroundColor: `${primary}14` }, indicatorMotion]} />
+      <Animated.View style={[styles.iconWrapper, iconMotion]}>
+        <Ionicons name={item.icon as any} size={22} color={focused ? primary : muted} />
+      </Animated.View>
+      <Text style={[styles.tabLabel, { color: focused ? primary : muted }]}>{item.label}</Text>
+    </Pressable>
+  );
+}
+
+function ScannerTabItem({ focused, onPress, primary, primaryDark, muted }: { focused: boolean; onPress: () => void; primary: string; primaryDark: string; muted: string }) {
+  const active = useSharedValue(focused ? 1 : 0);
+  const pressed = useSharedValue(0);
+  const reduceMotion = useReducedMotion();
+  useEffect(() => {
+    active.value = reduceMotion ? (focused ? 1 : 0) : withSpring(focused ? 1 : 0, motion.spring.tab);
+  }, [active, focused, reduceMotion]);
+  const buttonMotion = useAnimatedStyle(() => ({
+    transform: [{ scale: reduceMotion ? 1 : (1 + active.value * 0.055) * (pressed.value ? 0.94 : 1) }],
+  }));
+  const glowMotion = useAnimatedStyle(() => ({ opacity: 0.12 + active.value * 0.2, transform: [{ scale: 1 + active.value * 0.12 }] }));
+  return (
+    <Pressable
+      onPress={() => { void triggerHaptic('medium'); onPress(); }}
+      onPressIn={() => { pressed.set(withSpring(1, motion.spring.button)); }}
+      onPressOut={() => { pressed.set(withSpring(0, motion.spring.button)); }}
+      style={styles.scannerTabItem}
+    >
+      <Animated.View style={[styles.scannerGlow, { backgroundColor: primary }, glowMotion]} />
+      <Animated.View style={buttonMotion}>
+        <LinearGradient colors={[primary, primaryDark]} style={styles.scannerButton}>
+          <Ionicons name="scan-outline" size={24} color="#FFFFFF" />
+        </LinearGradient>
+      </Animated.View>
+      <Text style={[styles.tabLabel, { color: focused ? primary : muted, marginTop: 4 }]}>Escanear</Text>
+    </Pressable>
+  );
+}
 
 export default function TabLayout() {
   const { user, loading } = useAuth();
@@ -93,51 +154,26 @@ export default function TabLayout() {
 
               if (item.isScanner) {
                 return (
-                  <Pressable
+                  <ScannerTabItem
                     key={route.key}
                     onPress={onPress}
-                    style={styles.scannerTabItem}
-                  >
-                    <LinearGradient
-                      colors={[globalColors.primaryGlow, globalColors.primaryDark]}
-                      style={styles.scannerButton}
-                    >
-                      <Ionicons name="scan-outline" size={24} color="#FFFFFF" />
-                    </LinearGradient>
-                    <Text
-                      style={[
-                        styles.tabLabel,
-                        { color: isFocused ? globalColors.primary : colors.textLight, marginTop: 4 },
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
-                  </Pressable>
+                    focused={isFocused}
+                    primary={globalColors.primaryGlow}
+                    primaryDark={globalColors.primaryDark}
+                    muted={colors.textLight}
+                  />
                 );
               }
 
               return (
-                <Pressable
+                <TabItem
                   key={route.key}
+                  item={item}
+                  focused={isFocused}
                   onPress={onPress}
-                  style={styles.tabItem}
-                >
-                  <View style={[styles.iconWrapper, isFocused && { backgroundColor: `${globalColors.primary}10`, borderRadius: 12 }]}>
-                    <Ionicons
-                      name={item.icon as any}
-                      size={22}
-                      color={isFocused ? globalColors.primary : colors.textLight}
-                    />
-                  </View>
-                  <Text
-                    style={[
-                      styles.tabLabel,
-                      { color: isFocused ? globalColors.primary : colors.textLight },
-                    ]}
-                  >
-                    {item.label}
-                  </Text>
-                </Pressable>
+                  primary={globalColors.primary}
+                  muted={colors.textLight}
+                />
               );
             })}
           </View>
@@ -179,7 +215,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
+  activeIndicator: { position: 'absolute', top: 0, width: 44, height: 38, borderRadius: 13 },
   iconWrapper: {
     width: 38,
     height: 38,
@@ -197,7 +235,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: -28, // Float the button above the tab bar
+    position: 'relative',
   },
+  scannerGlow: { position: 'absolute', top: -4, width: 60, height: 60, borderRadius: 22 },
   scannerButton: {
     width: 52,
     height: 52,
