@@ -161,4 +161,4 @@ Reinicie o Expo depois da alteração. A câmera e a galeria continuam funcionan
 
 ## 📦 Materiais de apresentação
 
-Os slides e roteiros finais do projeto ficam na pasta [`apresentacao/`](apresentacao/). Arquivos intermediários usados para gerar e validar os slides não são versionados.
+Os roteiros do projeto ficam na pasta [`apresentacao/`](apresentacao/). Os slides PowerPoint são mantidos localmente e não são versionados, para reduzir o conteúdo do repositório e facilitar sua importação como contexto em assistentes de IA. Arquivos intermediários usados para gerar e validar os slides também não são versionados.

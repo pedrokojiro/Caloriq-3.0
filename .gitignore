@@ -46,3 +46,19 @@ example
 
 # arquivos temporários da geração da apresentação
 .presentation-build/
+
+# Slides locais: mantenha os roteiros leves no repositório
+/apresentacao/*.pptx
+
+# Assets antigos sem referências, preservados somente no computador
+/assets/expo.icon/
+/assets/images/android-icon-*.png
+/assets/images/expo-badge*.png
+/assets/images/expo-logo.png
+/assets/images/favicon.png
+/assets/images/icon.png
+/assets/images/logo-glow.png
+/assets/images/react-logo*.png
+/assets/images/splash-icon.png
+/assets/images/tabIcons/
+/assets/images/tutorial-web.png
