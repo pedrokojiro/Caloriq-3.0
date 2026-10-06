@@ -159,6 +159,3 @@ EXPO_PUBLIC_AI_DEMO_MODE=true
 
 Reinicie o Expo depois da alteração. A câmera e a galeria continuam funcionando, mas o resultado nutricional vem dos presets locais e nenhuma requisição é enviada ao Gemini. Com `false`, o app usa o Gemini normalmente e, na web, muda automaticamente para os dados locais se a chamada falhar.
 
-## 📦 Materiais de apresentação
-
-Os roteiros do projeto ficam na pasta [`apresentacao/`](apresentacao/). Os slides PowerPoint são mantidos localmente e não são versionados, para reduzir o conteúdo do repositório e facilitar sua importação como contexto em assistentes de IA. Arquivos intermediários usados para gerar e validar os slides também não são versionados.

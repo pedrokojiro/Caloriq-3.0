@@ -47,8 +47,8 @@ example
 # arquivos temporários da geração da apresentação
 .presentation-build/
 
-# Slides locais: mantenha os roteiros leves no repositório
-/apresentacao/*.pptx
+# Materiais da apresentação concluída, mantidos somente localmente
+/apresentacao/
 
 # Assets antigos sem referências, preservados somente no computador
 /assets/expo.icon/
