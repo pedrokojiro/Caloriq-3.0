@@ -10,13 +10,31 @@ const { calculateNutritionTargets, validateProfile } = require('./nutrition');
 const DEFAULT_LIMITS = Object.freeze({
   aiWindow: { limit: 30, windowMs: 10 * 60 * 1000 },
   aiConcurrent: 3,
+  loginIp: { limit: 20, windowMs: 15 * 60 * 1000 },
+  loginEmail: { limit: 8, windowMs: 15 * 60 * 1000 },
+  registerIp: { limit: 5, windowMs: 60 * 60 * 1000 },
 });
 
-function createApp({ pool, generateContent = defaultGenerateContent, limits = {} }) {
+// No Render a requisição passa por um único proxy, que informa o IP real em
+// X-Forwarded-For. Localmente não há proxy e o cabeçalho não deve ser confiado.
+function trustProxyFromEnv(env = process.env) {
+  const value = String(env.TRUST_PROXY ?? '').trim().toLowerCase();
+  if (!value) return env.RENDER ? 1 : false;
+  if (value === 'false' || value === '0') return false;
+  if (value === 'true') return 1;
+  return /^\d+$/.test(value) ? Number(value) : value;
+}
+
+function createApp({ pool, generateContent = defaultGenerateContent, limits = {}, trustProxy = trustProxyFromEnv() }) {
   const app = express();
+  app.set('trust proxy', trustProxy);
   const settings = { ...DEFAULT_LIMITS, ...limits };
   const aiWindowLimiter = new FixedWindowLimiter(settings.aiWindow);
   const aiConcurrency = new ConcurrencyLimiter({ limit: settings.aiConcurrent });
+  const loginIpLimiter = new FixedWindowLimiter(settings.loginIp);
+  const loginEmailLimiter = new FixedWindowLimiter(settings.loginEmail);
+  const registerIpLimiter = new FixedWindowLimiter(settings.registerIp);
+  const tooManyLogins = 'Muitas tentativas de login. Aguarde alguns minutos e tente novamente.';
 
   app.use(cors());
   app.use(express.json({ limit: '12mb' }));
@@ -28,7 +46,8 @@ function createApp({ pool, generateContent = defaultGenerateContent, limits = {}
     return token;
   }
 
-  app.post('/api/auth/register', async (request, response, next) => {
+  app.post('/api/auth/register', rateLimit(registerIpLimiter, request => request.ip,
+    'Muitos cadastros a partir desta rede. Tente novamente mais tarde.'), async (request, response, next) => {
     const body = request.body || {};
     const name = String(body.name || '').trim();
     const email = normalizeEmail(body.email);
@@ -42,7 +61,7 @@ function createApp({ pool, generateContent = defaultGenerateContent, limits = {}
       const id = randomUUID();
       const avatarText = Array.from(name)[0].toUpperCase();
       await client.query(`INSERT INTO users (id, name, email, password_hash, weight, avatar_text, streak, onboarding_completed)
-        VALUES ($1,$2,$3,$4,70,$5,0,FALSE)`, [id, name, email, hashPassword(password), avatarText]);
+        VALUES ($1,$2,$3,$4,70,$5,0,FALSE)`, [id, name, email, await hashPassword(password), avatarText]);
       await client.query(`INSERT INTO nutrition_goals (user_id, calories, protein, carbs, fat, water)
         VALUES ($1,2000,150,200,65,2500)`, [id]);
       const token = await issueSession(client, id);
@@ -55,14 +74,19 @@ function createApp({ pool, generateContent = defaultGenerateContent, limits = {}
     } finally { client.release(); }
   });
 
-  app.post('/api/auth/login', async (request, response, next) => {
+  app.post('/api/auth/login',
+    rateLimit(loginIpLimiter, request => request.ip, tooManyLogins),
+    rateLimit(loginEmailLimiter, request => normalizeEmail(request.body?.email) || null, tooManyLogins),
+    async (request, response, next) => {
     try {
       const body = request.body || {};
       const email = normalizeEmail(body.email);
       const password = String(body.password || '');
+      if (password.length > 128) return response.status(401).json({ error: 'E-mail ou senha incorretos.' });
       const result = await pool.query('SELECT id, name, email, password_hash, onboarding_completed FROM users WHERE LOWER(email) = $1', [email]);
       const user = result.rows[0];
-      if (!user || !verifyPassword(password, user.password_hash)) {
+      const passwordMatches = await verifyPassword(password, user?.password_hash);
+      if (!user || !passwordMatches) {
         return response.status(401).json({ error: 'E-mail ou senha incorretos.' });
       }
       const token = await issueSession(pool, user.id);
@@ -381,4 +405,4 @@ function createApp({ pool, generateContent = defaultGenerateContent, limits = {}
   return app;
 }
 
-module.exports = { createApp };
+module.exports = { createApp, trustProxyFromEnv };

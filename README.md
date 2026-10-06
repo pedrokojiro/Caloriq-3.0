@@ -56,6 +56,7 @@ Antes de salvar a refeição no diário, a tela de ajuste permite que você edit
 *   API Node.js/Express hospedada no Render.
 *   PostgreSQL hospedado no Supabase.
 *   Chave do Gemini mantida somente no backend, sem exposição no aplicativo.
+*   Pedidos de IA validados no servidor e limites de requisição em login, cadastro e IA (detalhes em `NUVEM_E_APK.md`).
 *   APK independente do computador de desenvolvimento e da rede local.
 
 ---
