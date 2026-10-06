@@ -9,7 +9,7 @@ interface BaseScreenProps {
   scrollable?: boolean;
   style?: StyleProp<ViewStyle>;
   contentContainerStyle?: StyleProp<ViewStyle>;
-  edges?: Array<'top' | 'right' | 'bottom' | 'left'>;
+  edges?: ('top' | 'right' | 'bottom' | 'left')[];
 }
 
 export const BaseScreen: React.FC<BaseScreenProps> = ({
