@@ -34,6 +34,13 @@ export interface DatabaseDiagnostics {
   counts: { meals: number; items: number; waterEntries: number } | null;
 }
 
+export class ApiError extends Error {
+  constructor(message: string, public status: number, public body: { error?: string; code?: string; total?: number } | null) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const token = await readAuthToken();
   const response = await fetch(`${await getApiUrl()}${path}`, {
@@ -41,8 +48,8 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init?.headers },
   });
   if (!response.ok) {
-    const body = await response.json().catch(() => null) as { error?: string } | null;
-    throw new Error(body?.error || `API local respondeu com status ${response.status}.`);
+    const body = await response.json().catch(() => null) as ApiError['body'];
+    throw new ApiError(body?.error || `API local respondeu com status ${response.status}.`, response.status, body);
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
