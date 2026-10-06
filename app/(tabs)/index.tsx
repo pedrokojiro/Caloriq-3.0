@@ -9,6 +9,7 @@ import Reanimated, { FadeInUp, LinearTransition, useAnimatedStyle, useReducedMot
 import { BaseScreen, Card, ProgressBar, CircularProgress, AnimatedNumber } from '../../src/components';
 import { motion } from '../../src/theme/motion';
 import { triggerHaptic } from '../../src/utils/haptics';
+import { formatMealTime } from '../../src/utils/time';
 
 const AnimatedPressable = Reanimated.createAnimatedComponent(Pressable);
 
@@ -320,7 +321,7 @@ export default function DashboardScreen() {
                     <View style={styles.mealInfo}>
                       <Text style={[styles.mealName, { color: colors.textMain }]}>{meal.name}</Text>
                       <Text style={[styles.mealMeta, { color: colors.textMuted }]}>
-                        {meal.type} · {meal.time}
+                        {meal.type} · {formatMealTime(meal.consumedAt, meal.time)}
                       </Text>
                       <Text style={[styles.mealMacros, { color: colors.textLight }]}>
                         P: {Math.round(meal.protein * meal.portions)}g  C: {Math.round(meal.carbs * meal.portions)}g  G: {Math.round(meal.fat * meal.portions)}g

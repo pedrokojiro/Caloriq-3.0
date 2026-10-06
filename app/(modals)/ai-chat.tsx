@@ -324,6 +324,7 @@ export default function AIChatModal() {
             placeholderTextColor={colors.textLight}
             style={[styles.textInput, { color: colors.textMain, backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}
             onSubmitEditing={handleSend}
+            maxLength={2000}
           />
           <Pressable
             onPress={handleSend}

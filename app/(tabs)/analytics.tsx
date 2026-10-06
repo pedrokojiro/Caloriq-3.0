@@ -4,20 +4,15 @@ import Reanimated, { FadeInUp, LinearTransition, useAnimatedStyle, useReducedMot
 import { BaseScreen, Card, ProgressBar, AnimatedNumber } from '../../src/components';
 import { useAppState } from '../../src/hooks/useAppState';
 import { useTheme } from '../../src/hooks/useTheme';
-import type { Meal } from '../../src/types';
+import { useDailyHistory } from '../../src/hooks/useDailyHistory';
+import { addDays, currentStreak, dateKey, startOfDay, zeroTotals, type DailyTotals, type Totals } from '../../src/utils/history';
 import { motion } from '../../src/theme/motion';
 import { triggerHaptic } from '../../src/utils/haptics';
 
 type Period = 'week' | 'month' | 'threeMonths';
-type Totals = { calories: number; protein: number; carbs: number; fat: number };
-type DailyTotals = Totals & { key: string; date: Date; meals: number };
 type ChartPoint = Totals & { label: string; daysTracked: number; goalReached: boolean };
 
 const DAY_MS = 86_400_000;
-const zeroTotals = (): Totals => ({ calories: 0, protein: 0, carbs: 0, fat: 0 });
-const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
-const addDays = (date: Date, amount: number) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount);
-const dateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 const round = (value: number) => Math.round(value);
 const format = (value: number) => round(value).toLocaleString('pt-BR');
 
@@ -69,37 +64,6 @@ function aggregate(days: DailyTotals[]): Totals {
     carbs: sum.carbs / days.length,
     fat: sum.fat / days.length,
   };
-}
-
-function buildDailyTotals(meals: Meal[]) {
-  const days = new Map<string, DailyTotals>();
-  meals.forEach(meal => {
-    if (!meal.consumedAt) return;
-    const consumedAt = new Date(meal.consumedAt);
-    if (Number.isNaN(consumedAt.getTime())) return;
-    const date = startOfDay(consumedAt);
-    const key = dateKey(date);
-    const current = days.get(key) || { ...zeroTotals(), key, date, meals: 0 };
-    const portions = Number.isFinite(meal.portions) ? meal.portions : 1;
-    current.calories += meal.calories * portions;
-    current.protein += meal.protein * portions;
-    current.carbs += meal.carbs * portions;
-    current.fat += meal.fat * portions;
-    current.meals += 1;
-    days.set(key, current);
-  });
-  return days;
-}
-
-function currentStreak(days: Map<string, DailyTotals>, today: Date) {
-  let cursor = startOfDay(today);
-  if (!days.has(dateKey(cursor))) cursor = addDays(cursor, -1);
-  let streak = 0;
-  while (days.has(dateKey(cursor))) {
-    streak += 1;
-    cursor = addDays(cursor, -1);
-  }
-  return streak;
 }
 
 function periodData(period: Period, dailyMap: Map<string, DailyTotals>, calorieGoal: number) {
@@ -165,7 +129,7 @@ export default function AnalyticsScreen() {
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('week');
   const [periodAnimation] = useState(() => new RNAnimated.Value(0));
   const reduceMotion = useReducedMotion();
-  const dailyMap = useMemo(() => buildDailyTotals(state.meals), [state.meals]);
+  const { dailyMap } = useDailyHistory(state.meals);
   const analytics = useMemo(() => periodData(selectedPeriod, dailyMap, state.goals.calories), [dailyMap, selectedPeriod, state.goals.calories]);
   const streak = useMemo(() => currentStreak(dailyMap, new Date()), [dailyMap]);
   const hasData = analytics.days.length > 0;
@@ -185,7 +149,7 @@ export default function AnalyticsScreen() {
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [periodAnimation, reduceMotion, selectedPeriod, state.meals.length]);
+  }, [periodAnimation, reduceMotion, selectedPeriod, dailyMap.size]);
 
   const contentTranslateY = periodAnimation.interpolate({ inputRange: [0, 1], outputRange: [26, 0] });
   const contentScale = periodAnimation.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] });

@@ -51,3 +51,18 @@ O servidor gratuito do Render dorme após um período sem uso. Antes da apresent
 ## Segredos
 
 `DATABASE_URL` e `GEMINI_API_KEY` existem apenas nas variáveis privadas do Render. `EXPO_PUBLIC_API_URL` não é segredo: é somente o endereço público do backend.
+
+## Limites de requisição
+
+A API limita o uso para proteger a cota do Gemini e as contas:
+
+| Rota | Limite |
+| --- | --- |
+| `POST /api/auth/login` | 20 por IP e 8 por e-mail a cada 15 minutos |
+| `POST /api/auth/register` | 5 por IP por hora |
+| `POST /api/ai/generate` | 30 por usuário a cada 10 minutos e até 3 análises simultâneas |
+
+Ao exceder, a API responde `429` com o cabeçalho `Retry-After`.
+
+- **Os contadores ficam em memória.** Eles zeram quando o serviço reinicia (por exemplo, quando o plano gratuito do Render dorme) e **não são compartilhados entre instâncias**. Se a API passar a rodar em mais de uma instância, mova os contadores para o PostgreSQL ou para um Redis.
+- **IP real atrás do proxy.** O Render coloca um proxy na frente da API e informa o IP do cliente em `X-Forwarded-For`. A variável `TRUST_PROXY=1` (já definida no `render.yaml`) faz o Express usar esse IP. Localmente, sem proxy, deixe `TRUST_PROXY` vazio ou `false`, senão qualquer cliente poderia forjar o cabeçalho para burlar o limite por IP.
