@@ -5,6 +5,7 @@ import { caloriqApi } from '../services/api';
 import type { ProfileUpdateInput } from '../services/api';
 import { subscribeSettings } from '../services/local-settings';
 import { useAuth } from './AuthContext';
+import { createId } from '../utils/id';
 
 interface AppContextProps {
   state: AppState;
@@ -96,7 +97,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const now = new Date();
     const meal: Meal = {
       ...mealData,
-      id: `meal-${Date.now()}`,
+      id: createId(),
       time: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       consumedAt: now.toISOString(),
     };

@@ -6,6 +6,7 @@ const { GeminiProxyError, generateContent: defaultGenerateContent } = require('.
 const { buildGeminiRequest } = require('./ai-validation');
 const { FixedWindowLimiter, ConcurrencyLimiter, rateLimit } = require('./rate-limit');
 const { calculateNutritionTargets, validateProfile } = require('./nutrition');
+const { validateMeal, validateMealId, validateWaterChange, validateGoals, dayBounds } = require('./validation');
 
 const DEFAULT_LIMITS = Object.freeze({
   aiWindow: { limit: 30, windowMs: 10 * 60 * 1000 },
@@ -232,18 +233,7 @@ function createApp({ pool, generateContent = defaultGenerateContent, limits = {}
   app.get('/api/state', async (_request, response, next) => {
     try {
       const userId = _request.userId;
-      const requestedStart = new Date(String(_request.query.dayStart || ''));
-      const requestedEnd = new Date(String(_request.query.dayEnd || ''));
-      const validBounds = !Number.isNaN(requestedStart.getTime())
-        && !Number.isNaN(requestedEnd.getTime())
-        && requestedEnd > requestedStart
-        && requestedEnd.getTime() - requestedStart.getTime() <= 27 * 60 * 60 * 1000;
-      const fallbackStart = new Date();
-      fallbackStart.setHours(0, 0, 0, 0);
-      const fallbackEnd = new Date(fallbackStart);
-      fallbackEnd.setDate(fallbackEnd.getDate() + 1);
-      const dayStart = validBounds ? requestedStart : fallbackStart;
-      const dayEnd = validBounds ? requestedEnd : fallbackEnd;
+      const { dayStart, dayEnd } = dayBounds(_request.query.dayStart, _request.query.dayEnd);
       const [profileResult, goalsResult, mealsResult, itemsResult, waterResult] = await Promise.all([
         pool.query(`SELECT name, streak, weight, avatar_text, avatar_url, age, height_cm, calculation_sex,
           activity_level, objective, motivation, mindset, onboarding_completed FROM users WHERE id = $1`, [userId]),
@@ -280,7 +270,8 @@ function createApp({ pool, generateContent = defaultGenerateContent, limits = {}
 
       const merged = {
         name: body.name === undefined ? current.name : String(body.name).trim(),
-        streak: body.streak === undefined ? current.streak : Number(body.streak),
+        // A sequência é mantida pelo servidor; valores enviados pelo app são ignorados.
+        streak: current.streak,
         weight: body.weight === undefined ? number(current.weight) : Number(body.weight),
         avatarText: body.avatarText === undefined ? current.avatar_text : String(body.avatarText).trim().slice(0, 4),
         age: body.age === undefined ? current.age : Number(body.age),
@@ -348,52 +339,131 @@ function createApp({ pool, generateContent = defaultGenerateContent, limits = {}
   });
 
   app.put('/api/goals', async (request, response, next) => {
+    const { goals, error } = validateGoals(request.body);
+    if (error) return response.status(400).json({ error });
     try {
-      const userId = request.userId;
-      const { calories, protein, carbs, fat, water } = request.body;
       const result = await pool.query(
         `UPDATE nutrition_goals SET calories = COALESCE($2, calories), protein = COALESCE($3, protein),
          carbs = COALESCE($4, carbs), fat = COALESCE($5, fat), water = COALESCE($6, water), updated_at = NOW()
-         WHERE user_id = $1 RETURNING *`, [userId, calories, protein, carbs, fat, water]
+         WHERE user_id = $1 RETURNING *`,
+        [request.userId, goals.calories ?? null, goals.protein ?? null, goals.carbs ?? null, goals.fat ?? null, goals.water ?? null]
       );
       response.json(result.rows[0]);
     } catch (error) { next(error); }
   });
 
-  async function saveMeal(meal, userId, replace = false) {
+  async function inTransaction(work) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      if (replace) await client.query('DELETE FROM meals WHERE id = $1 AND user_id = $2', [meal.id, userId]);
-      await client.query(
-        `INSERT INTO meals (id, user_id, name, type, calories, protein, carbs, fat, portions, emoji, confidence, insights, consumed_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,COALESCE($13::timestamptz,NOW()))`,
-        [meal.id, userId, meal.name, meal.type, meal.calories, meal.protein, meal.carbs, meal.fat, meal.portions, meal.emoji, meal.confidence, meal.insights, meal.consumedAt]
-      );
-      for (const [index, item] of (meal.items || []).entries()) {
-        await client.query(
-          `INSERT INTO meal_items (id, meal_id, name, amount, calories, protein, carbs, fat) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-          [item.id || `${meal.id}-item-${index}`, meal.id, item.name, item.amount, item.calories, item.protein, item.carbs, item.fat]
-        );
-      }
+      const result = await work(client);
       await client.query('COMMIT');
+      return result;
     } catch (error) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => undefined);
       throw error;
     } finally { client.release(); }
   }
 
+  // Os ids dos itens são gerados aqui; os enviados pelo app não são usados para
+  // evitar colisão de chave primária entre contas.
+  async function insertMealItems(client, mealId, items) {
+    for (const item of items) {
+      await client.query(
+        `INSERT INTO meal_items (id, meal_id, name, amount, calories, protein, carbs, fat) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [randomUUID(), mealId, item.name, item.amount, item.calories, item.protein, item.carbs, item.fat]
+      );
+    }
+  }
+
+  const mealValues = (meal, userId) => [meal.id, userId, meal.name, meal.type, meal.calories, meal.protein, meal.carbs,
+    meal.fat, meal.portions, meal.emoji, meal.confidence, meal.insights, meal.consumedAt];
+
+  // Insere a refeição com o id gerado pelo app. Se o id já existir, devolve o dono
+  // para diferenciar um reenvio do mesmo usuário de uma colisão com outra conta.
+  async function insertMeal(client, meal, userId) {
+    const inserted = await client.query(
+      `INSERT INTO meals (id, user_id, name, type, calories, protein, carbs, fat, portions, emoji, confidence, insights, consumed_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,COALESCE($13::timestamptz,NOW()))
+       ON CONFLICT (id) DO NOTHING RETURNING id`,
+      mealValues(meal, userId)
+    );
+    if (inserted.rowCount) {
+      await insertMealItems(client, meal.id, meal.items);
+      return { created: true };
+    }
+    const existing = await client.query('SELECT user_id FROM meals WHERE id = $1', [meal.id]);
+    return { created: false, ownerId: existing.rows[0]?.user_id };
+  }
+
   app.post('/api/meals', async (request, response, next) => {
-    try { await saveMeal(request.body, request.userId); response.status(201).json({ id: request.body.id }); } catch (error) { next(error); }
+    const { meal, error } = validateMeal(request.body);
+    if (error) return response.status(400).json({ error });
+    try {
+      const result = await inTransaction(client => insertMeal(client, meal, request.userId));
+      if (result.created) return response.status(201).json({ id: meal.id });
+      if (result.ownerId === request.userId) return response.status(200).json({ id: meal.id });
+      response.status(409).json({ error: 'Este identificador de refeição já está em uso. Tente salvar novamente.', code: 'MEAL_ID_CONFLICT' });
+    } catch (error) { next(error); }
   });
+
   app.put('/api/meals/:id', async (request, response, next) => {
-    try { await saveMeal({ ...request.body, id: request.params.id }, request.userId, true); response.json({ id: request.params.id }); } catch (error) { next(error); }
+    const { meal, error } = validateMeal({ ...request.body, id: request.params.id });
+    if (error) return response.status(400).json({ error });
+    try {
+      const status = await inTransaction(async (client) => {
+        const existing = await client.query('SELECT user_id FROM meals WHERE id = $1 FOR UPDATE', [meal.id]);
+        if (!existing.rowCount) {
+          // APKs antigos usam PUT também para refeições que não chegaram a ser criadas.
+          const result = await insertMeal(client, meal, request.userId);
+          return result.created || result.ownerId === request.userId ? 200 : 404;
+        }
+        if (existing.rows[0].user_id !== request.userId) return 404;
+        await client.query(
+          `UPDATE meals SET name = $3, type = $4, calories = $5, protein = $6, carbs = $7, fat = $8, portions = $9,
+           emoji = $10, confidence = $11, insights = $12, consumed_at = COALESCE($13::timestamptz, consumed_at), updated_at = NOW()
+           WHERE id = $1 AND user_id = $2`,
+          mealValues(meal, request.userId)
+        );
+        await client.query('DELETE FROM meal_items WHERE meal_id = $1', [meal.id]);
+        await insertMealItems(client, meal.id, meal.items);
+        return 200;
+      });
+      if (status === 404) return response.status(404).json({ error: 'Refeição não encontrada.' });
+      response.json({ id: meal.id });
+    } catch (error) { next(error); }
   });
+
   app.delete('/api/meals/:id', async (request, response, next) => {
-    try { await pool.query('DELETE FROM meals WHERE id = $1 AND user_id = $2', [request.params.id, request.userId]); response.status(204).end(); } catch (error) { next(error); }
+    if (!validateMealId(request.params.id)) return response.status(400).json({ error: 'Identificador de refeição inválido.' });
+    try {
+      await pool.query('DELETE FROM meals WHERE id = $1 AND user_id = $2', [request.params.id, request.userId]);
+      response.status(204).end();
+    } catch (error) { next(error); }
   });
+
   app.post('/api/water', async (request, response, next) => {
-    try { await pool.query('INSERT INTO water_entries (user_id, amount) VALUES ($1, $2)', [request.userId, request.body.amount]); response.status(201).json({ amount: request.body.amount }); } catch (error) { next(error); }
+    const { amount, error } = validateWaterChange(request.body);
+    if (error) return response.status(400).json({ error });
+    const { dayStart, dayEnd } = dayBounds(request.body.dayStart, request.body.dayEnd);
+    try {
+      const result = await inTransaction(async (client) => {
+        // Trava a linha do usuário para serializar ajustes simultâneos de água.
+        await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [request.userId]);
+        const current = await client.query(
+          'SELECT COALESCE(SUM(amount), 0) AS total FROM water_entries WHERE user_id = $1 AND consumed_at >= $2 AND consumed_at < $3',
+          [request.userId, dayStart, dayEnd]
+        );
+        const total = Number(current.rows[0].total);
+        if (total + amount < 0) return { rejected: true, total };
+        await client.query('INSERT INTO water_entries (user_id, amount) VALUES ($1, $2)', [request.userId, amount]);
+        return { rejected: false, total: total + amount };
+      });
+      if (result.rejected) {
+        return response.status(409).json({ error: 'O consumo de água do dia não pode ficar negativo.', code: 'WATER_NEGATIVE', total: result.total });
+      }
+      response.status(201).json({ amount, total: result.total });
+    } catch (error) { next(error); }
   });
 
   app.use((error, _request, response, _next) => {

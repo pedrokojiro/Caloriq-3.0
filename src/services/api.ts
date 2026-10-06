@@ -64,7 +64,7 @@ export const caloriqApi = {
   createMeal: (meal: Meal) => request('/api/meals', { method: 'POST', body: JSON.stringify(meal) }),
   updateMeal: (meal: Meal) => request(`/api/meals/${encodeURIComponent(meal.id)}`, { method: 'PUT', body: JSON.stringify(meal) }),
   deleteMeal: (mealId: string) => request(`/api/meals/${encodeURIComponent(mealId)}`, { method: 'DELETE' }),
-  addWater: (amount: number) => request('/api/water', { method: 'POST', body: JSON.stringify({ amount }) }),
+  addWater: (amount: number) => request<{ amount: number; total: number }>('/api/water', { method: 'POST', body: JSON.stringify({ amount, ...currentLocalDayBounds() }) }),
 };
 
 export interface AuthUser { id: string; name: string; email: string; onboardingCompleted: boolean }
