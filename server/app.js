@@ -18,6 +18,18 @@ const DEFAULT_LIMITS = Object.freeze({
 
 // No Render a requisição passa por um único proxy, que informa o IP real em
 // X-Forwarded-For. Localmente não há proxy e o cabeçalho não deve ser confiado.
+function resolveTimeZone(value) {
+  try {
+    return new Intl.DateTimeFormat('pt-BR', { timeZone: value }).resolvedOptions().timeZone;
+  } catch {
+    return 'America/Sao_Paulo';
+  }
+}
+
+const DISPLAY_TIME_ZONE = resolveTimeZone(process.env.DISPLAY_TIME_ZONE || 'America/Sao_Paulo');
+const displayTimeFormat = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: DISPLAY_TIME_ZONE });
+const formatDisplayTime = (value) => displayTimeFormat.format(new Date(value));
+
 function trustProxyFromEnv(env = process.env) {
   const value = String(env.TRUST_PROXY ?? '').trim().toLowerCase();
   if (!value) return env.RENDER ? 1 : false;
@@ -123,7 +135,9 @@ function createApp({ pool, generateContent = defaultGenerateContent, limits = {}
     confidence: number(meal.confidence),
     insights: meal.insights || undefined,
     consumedAt: new Date(meal.consumed_at).toISOString(),
-    time: new Date(meal.consumed_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    // Mantido para os APKs antigos, que exibem este campo. Versões novas calculam
+    // o horário a partir de consumedAt no fuso do aparelho.
+    time: formatDisplayTime(meal.consumed_at),
     items: items.filter(item => item.meal_id === meal.id).map(item => ({
       id: item.id, name: item.name, amount: item.amount,
       calories: number(item.calories), protein: number(item.protein), carbs: number(item.carbs), fat: number(item.fat),
@@ -475,4 +489,4 @@ function createApp({ pool, generateContent = defaultGenerateContent, limits = {}
   return app;
 }
 
-module.exports = { createApp, trustProxyFromEnv };
+module.exports = { createApp, trustProxyFromEnv, formatDisplayTime, resolveTimeZone };

@@ -6,6 +6,7 @@ import type { ProfileUpdateInput } from '../services/api';
 import { subscribeSettings } from '../services/local-settings';
 import { useAuth } from './AuthContext';
 import { createId } from '../utils/id';
+import { formatMealTime } from '../utils/time';
 import {
   SyncTracker, removeOptimisticMeal, restoreDeletedMeal, revertGoals, revertMealUpdate, revertWater,
 } from '../utils/optimistic';
@@ -155,8 +156,8 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const meal: Meal = {
       ...mealData,
       id: createId(),
-      time: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       consumedAt: now.toISOString(),
+      time: formatMealTime(now.toISOString()),
     };
     setMeals(current => [meal, ...current]);
     persist(

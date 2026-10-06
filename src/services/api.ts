@@ -4,6 +4,7 @@ import { readSettings } from './local-settings';
 import { readAuthToken } from './auth-storage';
 import type { AppState, Meal, NutritionGoals, UserProfile } from '../types';
 import type { NutritionProfileInput } from '../utils/nutrition';
+import { localDayBounds } from '../utils/time';
 
 const fallbackHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
 const configuredUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
@@ -17,13 +18,6 @@ if (hostUri) {
 const apiPort = process.env.EXPO_PUBLIC_API_PORT || '3333';
 const API_URL = (configuredUrl && configuredUrl !== 'auto' ? configuredUrl : `http://${host}:${apiPort}`).replace(/\/$/, '');
 export const getApiUrl = async () => (await readSettings()).apiUrl || API_URL;
-
-const currentLocalDayBounds = () => {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  return { dayStart: start.toISOString(), dayEnd: end.toISOString() };
-};
 
 export interface DatabaseDiagnostics {
   api: 'connected';
@@ -63,7 +57,7 @@ export const caloriqApi = {
   completeOnboarding: (profile: NutritionProfileInput) => request<OnboardingResponse>('/api/onboarding', { method: 'PUT', body: JSON.stringify(profile) }),
   getDatabaseDiagnostics: (signal: AbortSignal) => request<DatabaseDiagnostics>('/api/diagnostics/database', { signal, cache: 'no-store' }),
   getState: () => {
-    const { dayStart, dayEnd } = currentLocalDayBounds();
+    const { dayStart, dayEnd } = localDayBounds();
     return request<AppState>(`/api/state?dayStart=${encodeURIComponent(dayStart)}&dayEnd=${encodeURIComponent(dayEnd)}`);
   },
   updateProfile: (profile: ProfileUpdateInput) => request<ProfileUpdateResponse>('/api/profile', { method: 'PUT', body: JSON.stringify(profile) }),
@@ -71,7 +65,7 @@ export const caloriqApi = {
   createMeal: (meal: Meal) => request('/api/meals', { method: 'POST', body: JSON.stringify(meal) }),
   updateMeal: (meal: Meal) => request(`/api/meals/${encodeURIComponent(meal.id)}`, { method: 'PUT', body: JSON.stringify(meal) }),
   deleteMeal: (mealId: string) => request(`/api/meals/${encodeURIComponent(mealId)}`, { method: 'DELETE' }),
-  addWater: (amount: number) => request<{ amount: number; total: number }>('/api/water', { method: 'POST', body: JSON.stringify({ amount, ...currentLocalDayBounds() }) }),
+  addWater: (amount: number) => request<{ amount: number; total: number }>('/api/water', { method: 'POST', body: JSON.stringify({ amount, ...localDayBounds() }) }),
 };
 
 export interface AuthUser { id: string; name: string; email: string; onboardingCompleted: boolean }
