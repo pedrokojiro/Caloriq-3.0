@@ -91,12 +91,27 @@ function memoryDatabase(users = {}) {
       data.items = data.items.filter(item => !removed.some(meal => meal.id === item.meal_id));
       return rows([]);
     }
+    const ownMeals = () => data.meals.filter(meal => meal.user_id === params[0] && (params[1] === undefined || meal.consumed_at >= params[1]));
     if (/^SELECT \* FROM meals WHERE user_id = \$1/.test(text)) {
-      return rows(data.meals.filter(meal => meal.user_id === params[0]).sort((a, b) => b.consumed_at - a.consumed_at));
+      return rows(ownMeals().sort((a, b) => b.consumed_at - a.consumed_at));
     }
     if (/^SELECT mi\.\* FROM meal_items mi JOIN meals m/.test(text)) {
-      const ids = new Set(data.meals.filter(meal => meal.user_id === params[0]).map(meal => meal.id));
+      const ids = new Set(ownMeals().map(meal => meal.id));
       return rows(data.items.filter(item => ids.has(item.meal_id)));
+    }
+    if (/AT TIME ZONE \$4\)::date.* FROM meals WHERE user_id = \$1/.test(text)) {
+      const [userId, from, to, timeZone] = params;
+      const localDate = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
+      const days = new Map();
+      for (const meal of data.meals) {
+        if (meal.user_id !== userId || meal.consumed_at < from || meal.consumed_at >= to) continue;
+        const day = localDate.format(meal.consumed_at);
+        const totals = days.get(day) || { day, calories: 0, protein: 0, carbs: 0, fat: 0, meals: 0 };
+        for (const field of ['calories', 'protein', 'carbs', 'fat']) totals[field] += meal[field] * meal.portions;
+        totals.meals += 1;
+        days.set(day, totals);
+      }
+      return rows([...days.values()].sort((a, b) => a.day.localeCompare(b.day)));
     }
     if (/^SELECT id FROM users WHERE id = \$1 FOR UPDATE/.test(text)) {
       await lock(`user:${params[0]}`, session);

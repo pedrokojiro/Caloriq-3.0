@@ -98,6 +98,27 @@ function dayBounds(dayStart, dayEnd, now = new Date()) {
   return { dayStart: fallbackStart, dayEnd: fallbackEnd };
 }
 
+const MAX_HISTORY_DAYS = 400;
+
+function isTimeZone(value) {
+  if (typeof value !== 'string' || !value || value.length > 64) return false;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function historyRange(query) {
+  const from = new Date(String(query?.from || ''));
+  const to = new Date(String(query?.to || ''));
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to <= from) return { error: 'Informe um período válido.' };
+  if (to.getTime() - from.getTime() > MAX_HISTORY_DAYS * DAY_MS) return { error: `O período pode ter até ${MAX_HISTORY_DAYS} dias.` };
+  if (!isTimeZone(query.tz)) return { error: 'Fuso horário inválido.' };
+  return { from, to, timeZone: query.tz };
+}
+
 const GOAL_RANGES = Object.freeze({
   calories: { min: 500, max: 10_000, integer: true },
   protein: { min: 0, max: 2_000 },
@@ -121,4 +142,4 @@ function validateGoals(body) {
   return { goals };
 }
 
-module.exports = { MEAL_TYPES, validateMeal, validateMealId, validateWaterChange, validateGoals, dayBounds };
+module.exports = { MAX_HISTORY_DAYS, MEAL_TYPES, validateMeal, validateMealId, validateWaterChange, validateGoals, dayBounds, historyRange };

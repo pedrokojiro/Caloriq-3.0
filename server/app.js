@@ -6,7 +6,7 @@ const { GeminiProxyError, generateContent: defaultGenerateContent } = require('.
 const { buildGeminiRequest } = require('./ai-validation');
 const { FixedWindowLimiter, ConcurrencyLimiter, rateLimit } = require('./rate-limit');
 const { calculateNutritionTargets, validateProfile } = require('./nutrition');
-const { validateMeal, validateMealId, validateWaterChange, validateGoals, dayBounds } = require('./validation');
+const { validateMeal, validateMealId, validateWaterChange, validateGoals, dayBounds, historyRange } = require('./validation');
 
 const DEFAULT_LIMITS = Object.freeze({
   aiWindow: { limit: 30, windowMs: 10 * 60 * 1000 },
@@ -122,7 +122,16 @@ function createApp({ pool, generateContent = defaultGenerateContent, limits = {}
   }
 
   const number = (value) => Number(value);
-  const mealFromRows = (meal, items) => ({
+  const groupItems = (items) => {
+    const byMeal = new Map();
+    for (const item of items) {
+      if (!byMeal.has(item.meal_id)) byMeal.set(item.meal_id, []);
+      byMeal.get(item.meal_id).push(item);
+    }
+    return byMeal;
+  };
+
+  const mealFromRows = (meal, itemsByMeal) => ({
     id: meal.id,
     name: meal.name,
     type: meal.type,
@@ -138,7 +147,7 @@ function createApp({ pool, generateContent = defaultGenerateContent, limits = {}
     // Mantido para os APKs antigos, que exibem este campo. Versões novas calculam
     // o horário a partir de consumedAt no fuso do aparelho.
     time: formatDisplayTime(meal.consumed_at),
-    items: items.filter(item => item.meal_id === meal.id).map(item => ({
+    items: (itemsByMeal.get(meal.id) || []).map(item => ({
       id: item.id, name: item.name, amount: item.amount,
       calories: number(item.calories), protein: number(item.protein), carbs: number(item.carbs), fat: number(item.fat),
     })),
@@ -248,16 +257,25 @@ function createApp({ pool, generateContent = defaultGenerateContent, limits = {}
     try {
       const userId = _request.userId;
       const { dayStart, dayEnd } = dayBounds(_request.query.dayStart, _request.query.dayEnd);
+      // Versões novas pedem só as refeições recentes; sem o parâmetro o histórico
+      // completo continua sendo enviado, como os APKs antigos esperam.
+      const mealsSince = new Date(String(_request.query.mealsSince || ''));
+      const sinceFilter = Number.isNaN(mealsSince.getTime()) ? null : mealsSince;
       const [profileResult, goalsResult, mealsResult, itemsResult, waterResult] = await Promise.all([
         pool.query(`SELECT name, streak, weight, avatar_text, avatar_url, age, height_cm, calculation_sex,
           activity_level, objective, motivation, mindset, onboarding_completed FROM users WHERE id = $1`, [userId]),
         pool.query('SELECT calories, protein, carbs, fat, water FROM nutrition_goals WHERE user_id = $1', [userId]),
-        pool.query('SELECT * FROM meals WHERE user_id = $1 ORDER BY consumed_at DESC', [userId]),
-        pool.query('SELECT mi.* FROM meal_items mi JOIN meals m ON m.id = mi.meal_id WHERE m.user_id = $1', [userId]),
+        sinceFilter
+          ? pool.query('SELECT * FROM meals WHERE user_id = $1 AND consumed_at >= $2 ORDER BY consumed_at DESC', [userId, sinceFilter])
+          : pool.query('SELECT * FROM meals WHERE user_id = $1 ORDER BY consumed_at DESC', [userId]),
+        sinceFilter
+          ? pool.query('SELECT mi.* FROM meal_items mi JOIN meals m ON m.id = mi.meal_id WHERE m.user_id = $1 AND m.consumed_at >= $2', [userId, sinceFilter])
+          : pool.query('SELECT mi.* FROM meal_items mi JOIN meals m ON m.id = mi.meal_id WHERE m.user_id = $1', [userId]),
         pool.query('SELECT COALESCE(SUM(amount), 0) AS total FROM water_entries WHERE user_id = $1 AND consumed_at >= $2 AND consumed_at < $3', [userId, dayStart, dayEnd]),
       ]);
       const profile = profileResult.rows[0];
       const goals = goalsResult.rows[0];
+      const itemsByMeal = groupItems(itemsResult.rows);
       response.json({
         profile: { name: profile.name, streak: profile.streak, weight: number(profile.weight), avatarText: profile.avatar_text,
           avatarUrl: profile.avatar_url || undefined,
@@ -266,7 +284,7 @@ function createApp({ pool, generateContent = defaultGenerateContent, limits = {}
           objective: profile.objective || undefined, motivation: profile.motivation || undefined,
           mindset: profile.mindset || undefined, onboardingCompleted: profile.onboarding_completed },
         goals: { calories: goals.calories, protein: number(goals.protein), carbs: number(goals.carbs), fat: number(goals.fat), water: goals.water },
-        meals: mealsResult.rows.map(meal => mealFromRows(meal, itemsResult.rows)),
+        meals: mealsResult.rows.map(meal => mealFromRows(meal, itemsByMeal)),
         waterIntake: number(waterResult.rows[0].total),
       });
     } catch (error) { next(error); }
@@ -350,6 +368,28 @@ function createApp({ pool, generateContent = defaultGenerateContent, limits = {}
       await client.query('ROLLBACK').catch(() => undefined);
       next(error);
     } finally { client.release(); }
+  });
+
+  // Totais por dia local para o Analytics, sem baixar refeições e itens.
+  app.get('/api/meals/daily-totals', async (request, response, next) => {
+    const range = historyRange(request.query);
+    if (range.error) return response.status(400).json({ error: range.error });
+    try {
+      const result = await pool.query(
+        `SELECT to_char((consumed_at AT TIME ZONE $4)::date, 'YYYY-MM-DD') AS day,
+           SUM(calories * portions) AS calories, SUM(protein * portions) AS protein,
+           SUM(carbs * portions) AS carbs, SUM(fat * portions) AS fat, COUNT(*)::int AS meals
+         FROM meals WHERE user_id = $1 AND consumed_at >= $2 AND consumed_at < $3
+         GROUP BY 1 ORDER BY 1`,
+        [request.userId, range.from, range.to, range.timeZone]
+      );
+      response.json({
+        days: result.rows.map(row => ({
+          date: row.day, calories: number(row.calories), protein: number(row.protein),
+          carbs: number(row.carbs), fat: number(row.fat), meals: row.meals,
+        })),
+      });
+    } catch (error) { next(error); }
   });
 
   app.put('/api/goals', async (request, response, next) => {

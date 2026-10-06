@@ -5,6 +5,7 @@ import { readAuthToken } from './auth-storage';
 import type { AppState, Meal, NutritionGoals, UserProfile } from '../types';
 import type { NutritionProfileInput } from '../utils/nutrition';
 import { localDayBounds } from '../utils/time';
+import { recentMealsSince, type ServerDailyTotals } from '../utils/history';
 
 const fallbackHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
 const configuredUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
@@ -58,8 +59,12 @@ export const caloriqApi = {
   getDatabaseDiagnostics: (signal: AbortSignal) => request<DatabaseDiagnostics>('/api/diagnostics/database', { signal, cache: 'no-store' }),
   getState: () => {
     const { dayStart, dayEnd } = localDayBounds();
-    return request<AppState>(`/api/state?dayStart=${encodeURIComponent(dayStart)}&dayEnd=${encodeURIComponent(dayEnd)}`);
+    const mealsSince = recentMealsSince().toISOString();
+    return request<AppState>(`/api/state?dayStart=${encodeURIComponent(dayStart)}&dayEnd=${encodeURIComponent(dayEnd)}&mealsSince=${encodeURIComponent(mealsSince)}`);
   },
+  getDailyTotals: (from: string, to: string, timeZone: string) => request<{ days: ServerDailyTotals[] }>(
+    `/api/meals/daily-totals?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&tz=${encodeURIComponent(timeZone)}`,
+  ),
   updateProfile: (profile: ProfileUpdateInput) => request<ProfileUpdateResponse>('/api/profile', { method: 'PUT', body: JSON.stringify(profile) }),
   updateGoals: (goals: Partial<NutritionGoals>) => request('/api/goals', { method: 'PUT', body: JSON.stringify(goals) }),
   createMeal: (meal: Meal) => request('/api/meals', { method: 'POST', body: JSON.stringify(meal) }),
