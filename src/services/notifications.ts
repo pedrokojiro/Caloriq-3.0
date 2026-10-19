@@ -206,7 +206,7 @@ export async function saveNotificationPreferences(userId: string, preferences: N
 // Chamado quando o app abre ou algo é registrado: refaz os próximos 7 dias
 // sem pedir permissão de novo.
 export async function refreshNotificationPlan(userId: string, today: TodayStatus | null) {
-  if (!(await getNotificationPermission())) return;
+  if (Platform.OS === 'web' || !(await getNotificationPermission())) return;
   const prefs = await readNotificationPreferences(userId);
   if (!hasAnyReminder(prefs)) return;
   await enqueue(() => schedulePlan(userId, prefs, today));
@@ -214,6 +214,8 @@ export async function refreshNotificationPlan(userId: string, today: TodayStatus
 
 // Abre a tela indicada na notificação tocada, inclusive quando ela abriu o app.
 export function subscribeToNotificationTaps(open: (url: string) => void) {
+  // Na web não há notificações locais agendadas pelo app (nem resposta a toque).
+  if (Platform.OS === 'web') return () => undefined;
   let subscription: { remove: () => void } | null = null;
   let cancelled = false;
   void loadNotifications().then(async notifications => {
@@ -222,9 +224,9 @@ export function subscribeToNotificationTaps(open: (url: string) => void) {
       const url = response?.notification.request.content.data?.url;
       if (typeof url === 'string' && url.startsWith('/')) open(url);
     };
-    handle(await notifications.getLastNotificationResponseAsync());
+    handle(await notifications.getLastNotificationResponseAsync().catch(() => null));
     if (!cancelled) subscription = notifications.addNotificationResponseReceivedListener(handle);
-  });
+  }).catch(error => console.warn('Não foi possível acompanhar os toques nas notificações.', error));
   return () => { cancelled = true; subscription?.remove(); };
 }
 
