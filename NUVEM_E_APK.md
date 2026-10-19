@@ -66,3 +66,15 @@ Ao exceder, a API responde `429` com o cabeçalho `Retry-After`.
 
 - **Os contadores ficam em memória.** Eles zeram quando o serviço reinicia (por exemplo, quando o plano gratuito do Render dorme) e **não são compartilhados entre instâncias**. Se a API passar a rodar em mais de uma instância, mova os contadores para o PostgreSQL ou para um Redis.
 - **IP real atrás do proxy.** O Render coloca um proxy na frente da API e informa o IP do cliente em `X-Forwarded-For`. A variável `TRUST_PROXY=1` (já definida no `render.yaml`) faz o Express usar esse IP. Localmente, sem proxy, deixe `TRUST_PROXY` vazio ou `false`, senão qualquer cliente poderia forjar o cabeçalho para burlar o limite por IP.
+
+## E-mail de recuperação de senha
+
+A tela **Esqueci minha senha** envia um código de 6 dígitos pelo [Resend](https://resend.com).
+
+1. Crie uma conta no Resend e verifique um domínio (Domains → Add domain), adicionando os registros DNS indicados.
+2. Gere uma API key com permissão de envio.
+3. No Render, preencha `RESEND_API_KEY` e `RESEND_FROM` (por exemplo `CaloriQ <nao-responda@seu-dominio.com>`).
+
+Sem domínio verificado, o Resend só entrega para o e-mail dono da conta Resend. Sem `RESEND_API_KEY`, a API não envia nada e registra um aviso no log. Para testar localmente, use `MAIL_DEV_LOG=true`: o código aparece no console da API. Nunca ative isso em produção.
+
+O código vale por 15 minutos, aceita até 5 tentativas e é guardado só como hash. Ao trocar a senha, todas as sessões da conta são encerradas.

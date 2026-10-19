@@ -53,6 +53,8 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
 export const caloriqApi = {
   register: (data: { name: string; email: string; password: string }) => request<AuthResponse>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
   login: (email: string, password: string) => request<AuthResponse>('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  requestPasswordReset: (email: string) => request<{ message: string }>('/api/auth/password/forgot', { method: 'POST', body: JSON.stringify({ email }) }),
+  resetPassword: (email: string, code: string, password: string) => request<AuthResponse>('/api/auth/password/reset', { method: 'POST', body: JSON.stringify({ email, code, password }) }),
   getCurrentUser: () => request<{ user: AuthUser }>('/api/auth/me'),
   logout: () => request<void>('/api/auth/logout', { method: 'POST' }),
   completeOnboarding: (profile: NutritionProfileInput) => request<OnboardingResponse>('/api/onboarding', { method: 'PUT', body: JSON.stringify(profile) }),

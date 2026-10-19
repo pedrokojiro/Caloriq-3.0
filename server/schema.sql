@@ -82,6 +82,17 @@ CREATE TABLE IF NOT EXISTS water_entries (
 
 CREATE INDEX IF NOT EXISTS water_user_consumed_idx ON water_entries(user_id, consumed_at DESC);
 
+CREATE TABLE IF NOT EXISTS password_reset_codes (
+  id BIGSERIAL PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  code_hash CHAR(64) NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS password_reset_user_idx ON password_reset_codes(user_id, created_at DESC);
+
 -- Remove os registros de demonstração criados pelas versões antigas.
 -- Contas e refeições reais usam UUIDs e não são afetadas.
 DELETE FROM users WHERE id = 'local-user';

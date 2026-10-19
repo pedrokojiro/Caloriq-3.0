@@ -9,6 +9,7 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, password: string) => Promise<AuthUser>;
   register: (data: { name: string; email: string; password: string }) => Promise<AuthUser>;
+  resetPassword: (email: string, code: string, password: string) => Promise<AuthUser>;
   completeOnboarding: (profile: NutritionProfileInput) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -37,6 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user, loading,
     login: async (email, password) => accept(await caloriqApi.login(email, password)),
     register: async data => accept(await caloriqApi.register(data)),
+    resetPassword: async (email, code, password) => accept(await caloriqApi.resetPassword(email, code, password)),
     completeOnboarding: async profile => {
       const result = await caloriqApi.completeOnboarding(profile);
       setUser(result.user);

@@ -99,6 +99,13 @@ export default function LoginScreen() {
           rightIcon={<Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={21} color="#7B8492" />}
           onRightIconPress={() => setShowPassword(value => !value)}
         />
+        <Pressable
+          onPress={() => router.push({ pathname: '/(auth)/forgot-password', params: email.trim() ? { email: email.trim() } : {} } as never)}
+          style={styles.forgot}
+          accessibilityRole="link"
+        >
+          <Text style={styles.forgotText}>Esqueci minha senha</Text>
+        </Pressable>
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <Button title="Entrar na minha conta" onPress={handleLogin} loading={loading} disabled={!email.trim() || !password} style={styles.button} haptic="medium" />
       </Animated.View>
@@ -128,6 +135,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 32, fontWeight: '900', color: '#0D1117', letterSpacing: -1, marginBottom: 8 },
   subtitle: { fontSize: 15, lineHeight: 22, color: '#6B7585', maxWidth: 330 },
   formCard: { borderRadius: 24, borderWidth: 1, borderColor: '#E8EAEE', backgroundColor: '#FFF', padding: 20, shadowColor: '#101828', shadowOpacity: 0.06, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 3 },
+  forgot: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center', paddingHorizontal: 4, marginTop: -8, marginBottom: 6 },
+  forgotText: { color: '#0E7A3E', fontSize: 14, fontWeight: '700' },
   error: { color: '#D92D20', fontSize: 13, lineHeight: 18, marginTop: -4, marginBottom: 14 },
   button: { marginTop: 2, height: 56 },
   footer: { alignItems: 'center', padding: 24 },

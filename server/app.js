@@ -6,6 +6,8 @@ const { GeminiProxyError, generateContent: defaultGenerateContent } = require('.
 const { buildGeminiRequest } = require('./ai-validation');
 const { FixedWindowLimiter, ConcurrencyLimiter, rateLimit } = require('./rate-limit');
 const { calculateNutritionTargets, validateProfile } = require('./nutrition');
+const { createMailer } = require('./mailer');
+const { registerPasswordReset } = require('./password-reset');
 const { validateMeal, validateMealId, validateWaterChange, validateGoals, dayBounds, historyRange } = require('./validation');
 
 const DEFAULT_LIMITS = Object.freeze({
@@ -15,6 +17,9 @@ const DEFAULT_LIMITS = Object.freeze({
   loginEmail: { limit: 8, windowMs: 15 * 60 * 1000 },
   registerIp: { limit: 5, windowMs: 60 * 60 * 1000 },
   authIp: { limit: 120, windowMs: 60 * 1000 },
+  forgotIp: { limit: 5, windowMs: 15 * 60 * 1000 },
+  forgotEmail: { limit: 3, windowMs: 15 * 60 * 1000 },
+  resetIp: { limit: 10, windowMs: 15 * 60 * 1000 },
 });
 
 // No Render a requisição passa por um único proxy, que informa o IP real em
@@ -39,7 +44,7 @@ function trustProxyFromEnv(env = process.env) {
   return /^\d+$/.test(value) ? Number(value) : value;
 }
 
-function createApp({ pool, generateContent = defaultGenerateContent, limits = {}, trustProxy = trustProxyFromEnv() }) {
+function createApp({ pool, generateContent = defaultGenerateContent, sendEmail = createMailer(), limits = {}, trustProxy = trustProxyFromEnv() }) {
   const app = express();
   app.set('trust proxy', trustProxy);
   const settings = { ...DEFAULT_LIMITS, ...limits };
@@ -87,6 +92,8 @@ function createApp({ pool, generateContent = defaultGenerateContent, limits = {}
       next(error);
     } finally { client.release(); }
   });
+
+  registerPasswordReset(app, { pool, sendEmail, issueSession, limits: settings });
 
   const authIpLimiter = new FixedWindowLimiter(settings.authIp);
   const tooManyAuthRequests = `Muitas requisições. Tente novamente em ${Math.ceil(settings.authIp.windowMs / 60000)} minuto(s).`;

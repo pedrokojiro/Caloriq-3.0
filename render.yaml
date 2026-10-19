@@ -16,6 +16,10 @@ services:
         sync: false
       - key: GEMINI_MODEL
         value: gemini-3.6-flash
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        sync: false
       - key: TRUST_PROXY
         value: 1
       - key: DISPLAY_TIME_ZONE
