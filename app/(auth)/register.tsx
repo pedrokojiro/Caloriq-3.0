@@ -7,12 +7,13 @@ import { BaseScreen, Button, Input } from '../../src/components';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAuth } from '../../src/context/AuthContext';
 import { AuthMotionBackground } from '../../src/components/AuthMotionBackground';
+import { GoogleSignInButton } from '../../src/components/GoogleSignInButton';
 import { useReducedMotion } from 'react-native-reanimated';
 
 export default function RegisterScreen() {
   const router = useRouter();
   const { globalColors } = useTheme();
-  const { register } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -91,6 +92,11 @@ export default function RegisterScreen() {
         <Input label="Confirmar senha" value={confirm} onChangeText={setConfirm} placeholder="Digite novamente" secureTextEntry={!showPassword} autoCapitalize="none" autoCorrect={false} autoComplete="off" importantForAutofill="no" />
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <Button title="Continuar para minhas metas" onPress={submit} loading={loading} disabled={!name.trim() || !email.trim() || password.length < 8 || !confirm} style={styles.button} haptic="medium" />
+        <GoogleSignInButton
+          onSignIn={loginWithGoogle}
+          onSuccess={user => router.replace((user.onboardingCompleted ? '/(tabs)' : '/(auth)/profile-setup') as never)}
+          onError={setError}
+        />
         <View style={styles.securityRow}>
           <Ionicons name="shield-checkmark-outline" size={16} color={globalColors.primary} />
           <Text style={styles.securityText}>Seus dados ficam vinculados somente à sua conta.</Text>

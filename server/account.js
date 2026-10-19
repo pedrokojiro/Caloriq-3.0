@@ -16,10 +16,21 @@ function registerAccount(app, { pool, limits, collectFiles = async () => [], rem
   const tooMany = 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
   const byUser = request => request.userId;
 
-  async function checkPassword(userId, password) {
+  async function passwordHashOf(userId) {
     const result = await pool.query('SELECT password_hash FROM users WHERE id = $1', [userId]);
-    return verifyPassword(String(password || '').slice(0, 128), result.rows[0]?.password_hash);
+    return result.rows[0]?.password_hash || null;
   }
+  async function checkPassword(userId, password) {
+    return verifyPassword(String(password || '').slice(0, 128), await passwordHashOf(userId));
+  }
+
+  // Contas criadas com Google não têm senha: elas podem definir uma e excluir a conta só com a confirmação.
+  app.get('/api/account/security', async (request, response, next) => {
+    try {
+      const result = await pool.query('SELECT password_hash IS NOT NULL AS has_password, google_sub IS NOT NULL AS google_linked FROM users WHERE id = $1', [request.userId]);
+      response.json({ hasPassword: Boolean(result.rows[0]?.has_password), googleLinked: Boolean(result.rows[0]?.google_linked) });
+    } catch (error) { next(error); }
+  });
 
   app.get('/api/account/sessions', async (request, response, next) => {
     try {
@@ -64,8 +75,9 @@ function registerAccount(app, { pool, limits, collectFiles = async () => [], rem
     const next_ = String(newPassword || '');
     if (next_.length < 8 || next_.length > 128) return response.status(400).json({ error: 'A nova senha deve ter entre 8 e 128 caracteres.' });
     try {
-      if (!(await checkPassword(request.userId, currentPassword))) return response.status(400).json({ error: 'A senha atual está incorreta.' });
-      if (await checkPassword(request.userId, next_)) return response.status(400).json({ error: 'A nova senha precisa ser diferente da atual.' });
+      const hasPassword = Boolean(await passwordHashOf(request.userId));
+      if (hasPassword && !(await checkPassword(request.userId, currentPassword))) return response.status(400).json({ error: 'A senha atual está incorreta.' });
+      if (hasPassword && await checkPassword(request.userId, next_)) return response.status(400).json({ error: 'A nova senha precisa ser diferente da atual.' });
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
@@ -121,7 +133,7 @@ function registerAccount(app, { pool, limits, collectFiles = async () => [], rem
   app.delete('/api/account', rateLimit(passwordLimiter, byUser, tooMany), async (request, response, next) => {
     try {
       if (request.body?.confirm !== 'EXCLUIR') return response.status(400).json({ error: 'Confirme digitando EXCLUIR.' });
-      if (!(await checkPassword(request.userId, request.body?.password))) return response.status(400).json({ error: 'A senha está incorreta.' });
+      if (await passwordHashOf(request.userId) && !(await checkPassword(request.userId, request.body?.password))) return response.status(400).json({ error: 'A senha está incorreta.' });
       // Os arquivos (fotos) precisam ser listados antes: as linhas somem por cascata junto com a conta.
       const files = await collectFiles(request.userId);
       // As tabelas relacionadas usam ON DELETE CASCADE: refeições, água, metas, sessões, códigos e fotos.

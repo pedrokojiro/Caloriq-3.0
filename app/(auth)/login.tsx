@@ -7,12 +7,13 @@ import { BaseScreen, Button, Input } from '../../src/components';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAuth } from '../../src/context/AuthContext';
 import { AuthMotionBackground } from '../../src/components/AuthMotionBackground';
+import { GoogleSignInButton } from '../../src/components/GoogleSignInButton';
 import { useReducedMotion } from 'react-native-reanimated';
 
 export default function LoginScreen() {
   const router = useRouter();
   const { globalColors } = useTheme();
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -108,6 +109,11 @@ export default function LoginScreen() {
         </Pressable>
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <Button title="Entrar na minha conta" onPress={handleLogin} loading={loading} disabled={!email.trim() || !password} style={styles.button} haptic="medium" />
+        <GoogleSignInButton
+          onSignIn={loginWithGoogle}
+          onSuccess={user => router.replace((user.onboardingCompleted ? '/(tabs)' : '/(auth)/profile-setup') as never)}
+          onError={setError}
+        />
       </Animated.View>
 
       <Animated.View style={{ opacity: formEntrance }}>

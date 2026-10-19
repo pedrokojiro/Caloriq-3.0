@@ -21,6 +21,8 @@ export default function AccountScreen() {
   const danger = isDark ? '#FF8A7A' : '#C4320A';
 
   const [sessions, setSessions] = useState<AccountSession[] | null>(null);
+  const [hasPassword, setHasPassword] = useState(true);
+  const [googleLinked, setGoogleLinked] = useState(false);
   const [sessionStatus, setSessionStatus] = useState<Status>(null);
   const [busySession, setBusySession] = useState<string | null>(null);
 
@@ -51,6 +53,9 @@ export default function AccountScreen() {
 
   useEffect(() => {
     let active = true;
+    caloriqApi.getAccountSecurity()
+      .then(result => { if (active) { setHasPassword(result.hasPassword); setGoogleLinked(result.googleLinked); } })
+      .catch(() => undefined);
     caloriqApi.getSessions()
       .then(result => { if (active) setSessions(result.sessions); })
       .catch(reason => {
@@ -93,7 +98,8 @@ export default function AccountScreen() {
       const { endedSessions } = await caloriqApi.changePassword(currentPassword, newPassword);
       setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
       setPasswordOpen(false);
-      setPasswordStatus({ kind: 'ok', text: endedSessions ? `Senha alterada. Saímos da conta em ${endedSessions} outro(s) aparelho(s).` : 'Senha alterada.' });
+      setPasswordStatus({ kind: 'ok', text: endedSessions ? `Senha salva. Saímos da conta em ${endedSessions} outro(s) aparelho(s).` : 'Senha salva.' });
+      setHasPassword(true);
       void loadSessions();
     } catch (reason) {
       setPasswordStatus({ kind: 'error', text: errorText(reason, 'Não foi possível alterar a senha.') });
@@ -147,17 +153,19 @@ export default function AccountScreen() {
           <Pressable onPress={() => setPasswordOpen(open => !open)} style={styles.row} accessibilityRole="button" accessibilityState={{ expanded: passwordOpen }}>
             <Ionicons name="key-outline" size={22} color={brandText} />
             <View style={styles.rowText}>
-              <Text style={[styles.rowTitle, { color: colors.textMain }]}>Alterar senha</Text>
-              <Text style={[styles.rowSubtitle, { color: colors.textMuted }]}>Você continua conectado neste aparelho.</Text>
+              <Text style={[styles.rowTitle, { color: colors.textMain }]}>{hasPassword ? 'Alterar senha' : 'Definir uma senha'}</Text>
+              <Text style={[styles.rowSubtitle, { color: colors.textMuted }]}>
+                {hasPassword ? 'Você continua conectado neste aparelho.' : 'Sua conta usa o Google. Com uma senha, você também entra pelo e-mail.'}
+              </Text>
             </View>
             <Ionicons name={passwordOpen ? 'chevron-up' : 'chevron-down'} size={20} color={colors.textMuted} />
           </Pressable>
           {passwordOpen ? (
             <View style={styles.form}>
-              <Input label="Senha atual" value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry autoCapitalize="none" autoComplete="current-password" textContentType="password" />
+              {hasPassword ? <Input label="Senha atual" value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry autoCapitalize="none" autoComplete="current-password" textContentType="password" /> : null}
               <Input label="Nova senha" value={newPassword} onChangeText={setNewPassword} placeholder="Mínimo de 8 caracteres" secureTextEntry autoCapitalize="none" autoComplete="new-password" textContentType="newPassword" />
               <Input label="Confirmar nova senha" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry autoCapitalize="none" autoComplete="new-password" textContentType="newPassword" />
-              <Button title="Salvar nova senha" onPress={savePassword} loading={savingPassword} disabled={!currentPassword || newPassword.length < 8 || !confirmPassword} />
+              <Button title="Salvar nova senha" onPress={savePassword} loading={savingPassword} disabled={(hasPassword && !currentPassword) || newPassword.length < 8 || !confirmPassword} />
             </View>
           ) : null}
           {statusLine(passwordStatus)}
@@ -194,6 +202,13 @@ export default function AccountScreen() {
           {statusLine(sessionStatus)}
         </Card>
 
+        {googleLinked ? (
+          <Card style={[styles.card, styles.row]}>
+            <Ionicons name="logo-google" size={20} color={brandText} />
+            <Text style={[styles.rowSubtitle, { color: colors.textMuted, flex: 1 }]}>Conta Google vinculada. Você pode entrar com o botão “Continuar com Google”.</Text>
+          </Card>
+        ) : null}
+
         {sectionTitle('SEUS DADOS')}
         <Card style={styles.card}>
           <Text style={[styles.rowTitle, { color: colors.textMain }]}>O que o CaloriQ guarda</Text>
@@ -221,12 +236,12 @@ export default function AccountScreen() {
           </Text>
           {deleteOpen ? (
             <View style={styles.form}>
-              <Input label="Sua senha" value={deletePassword} onChangeText={setDeletePassword} secureTextEntry autoCapitalize="none" autoComplete="current-password" />
+              {hasPassword ? <Input label="Sua senha" value={deletePassword} onChangeText={setDeletePassword} secureTextEntry autoCapitalize="none" autoComplete="current-password" /> : null}
               <Input label='Digite "EXCLUIR" para confirmar' value={deleteConfirm} onChangeText={setDeleteConfirm} autoCapitalize="characters" autoCorrect={false} />
               <Pressable
                 onPress={deleteAccount}
-                disabled={deleting || !deletePassword || deleteConfirm.trim().toUpperCase() !== 'EXCLUIR'}
-                style={[styles.dangerBtn, { backgroundColor: danger, opacity: deleting || !deletePassword || deleteConfirm.trim().toUpperCase() !== 'EXCLUIR' ? 0.5 : 1 }]}
+                disabled={deleting || (hasPassword && !deletePassword) || deleteConfirm.trim().toUpperCase() !== 'EXCLUIR'}
+                style={[styles.dangerBtn, { backgroundColor: danger, opacity: deleting || (hasPassword && !deletePassword) || deleteConfirm.trim().toUpperCase() !== 'EXCLUIR' ? 0.5 : 1 }]}
                 accessibilityRole="button"
               >
                 {deleting ? <ActivityIndicator color={isDark ? '#0D1117' : '#FFFFFF'} /> : <Text style={[styles.dangerLabel, { color: isDark ? '#0D1117' : '#FFFFFF' }]}>Excluir minha conta para sempre</Text>}

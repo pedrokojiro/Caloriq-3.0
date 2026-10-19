@@ -8,6 +8,7 @@ const { FixedWindowLimiter, ConcurrencyLimiter, rateLimit } = require('./rate-li
 const { calculateNutritionTargets, validateProfile } = require('./nutrition');
 const { createMailer } = require('./mailer');
 const { registerPasswordReset } = require('./password-reset');
+const { createGoogleVerifier, registerGoogleAuth } = require('./google-auth');
 const { registerAccount, deviceLabel } = require('./account');
 const { registerReports } = require('./reports');
 const { registerAppVersion } = require('./app-version');
@@ -51,7 +52,7 @@ function trustProxyFromEnv(env = process.env) {
   return /^\d+$/.test(value) ? Number(value) : value;
 }
 
-function createApp({ pool, generateContent = defaultGenerateContent, sendEmail = createMailer(), limits = {}, trustProxy = trustProxyFromEnv(), env = process.env, storage = createStorage() }) {
+function createApp({ pool, generateContent = defaultGenerateContent, sendEmail = createMailer(), limits = {}, trustProxy = trustProxyFromEnv(), env = process.env, storage = createStorage(), googleVerifier = createGoogleVerifier() }) {
   const app = express();
   app.set('trust proxy', trustProxy);
   const settings = { ...DEFAULT_LIMITS, ...limits };
@@ -101,6 +102,7 @@ function createApp({ pool, generateContent = defaultGenerateContent, sendEmail =
   });
 
   registerPasswordReset(app, { pool, sendEmail, issueSession, limits: settings });
+  registerGoogleAuth(app, { pool, verifier: googleVerifier, issueSession, limits: settings });
 
   const authIpLimiter = new FixedWindowLimiter(settings.authIp);
   const tooManyAuthRequests = `Muitas requisições. Tente novamente em ${Math.ceil(settings.authIp.windowMs / 60000)} minuto(s).`;

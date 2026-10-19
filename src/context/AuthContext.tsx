@@ -3,6 +3,7 @@ import { caloriqApi, type AuthUser } from '../services/api';
 import type { NutritionProfileInput } from '../utils/nutrition';
 import { clearAuthToken, readAuthToken, saveAuthToken } from '../services/auth-storage';
 import { cancelNotificationSchedule } from '../services/notifications';
+import { getGoogleIdToken, signOutFromGoogle } from '../services/google-auth';
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -10,6 +11,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<AuthUser>;
   register: (data: { name: string; email: string; password: string }) => Promise<AuthUser>;
   resetPassword: (email: string, code: string, password: string) => Promise<AuthUser>;
+  loginWithGoogle: () => Promise<AuthUser | null>;
   completeOnboarding: (profile: NutritionProfileInput) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -39,6 +41,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     login: async (email, password) => accept(await caloriqApi.login(email, password)),
     register: async data => accept(await caloriqApi.register(data)),
     resetPassword: async (email, code, password) => accept(await caloriqApi.resetPassword(email, code, password)),
+    loginWithGoogle: async () => {
+      const idToken = await getGoogleIdToken();
+      return idToken ? accept(await caloriqApi.loginWithGoogle(idToken)) : null;
+    },
     completeOnboarding: async profile => {
       const result = await caloriqApi.completeOnboarding(profile);
       setUser(result.user);
@@ -47,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try { await caloriqApi.logout(); } finally {
         if (user?.id) await cancelNotificationSchedule(user.id).catch(() => {});
         await clearAuthToken();
+        await signOutFromGoogle();
         setUser(null);
       }
     },

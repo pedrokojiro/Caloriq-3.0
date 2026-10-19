@@ -106,3 +106,17 @@ Em **Evolução visual**, o usuário pode ativar **Guardar na nuvem**. A opção
 3. No Render, preencha `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY`. A service role ignora as regras de acesso do Supabase: nunca a coloque no app nem em variáveis `EXPO_PUBLIC_*`.
 
 As imagens só são entregues por URLs assinadas que expiram em 1 hora. Cada arquivo fica em `<id do usuário>/<id da foto>`. A API confere o conteúdo (JPG, PNG ou WebP, até 4 MB) e limita a 30 envios por hora. Excluir a foto ou a conta apaga também o arquivo do bucket. Sem as variáveis, a API responde `503` e o app continua guardando as fotos só no aparelho.
+
+## Login com Google
+
+O botão **Continuar com Google** aparece no Login e no Cadastro do APK quando `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` está definido no build. Ele não aparece no Expo Go nem na web.
+
+1. No [Google Cloud Console](https://console.cloud.google.com/), crie ou escolha um projeto e configure a **Tela de consentimento OAuth**: tipo Externo, nome CaloriQ e e-mail de suporte.
+2. Em **APIs e serviços → Credenciais → Criar credenciais → ID do cliente OAuth**, crie um cliente do tipo **Aplicativo da Web**. Esse é o Client ID usado nos passos 4 e 5.
+3. Crie outro cliente do tipo **Android**:
+   - Nome do pacote: `com.pedrokojiro.caloriq`.
+   - SHA-1: rode `eas credentials -p android`, escolha o perfil `preview` e copie o **SHA1 Fingerprint** do keystore.
+4. No `eas.json`, em `build.preview.env`, adicione `"EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "<client id web>"` e gere um APK novo.
+5. No Render, defina `GOOGLE_CLIENT_IDS` com o mesmo Client ID web.
+
+A API confere a assinatura do token com as chaves públicas do Google, o emissor, o Client ID, a validade e se o e-mail foi verificado. Se o e-mail já tiver conta com senha, o Google é vinculado a ela. Senão, uma conta nova é criada e segue para o cadastro do perfil. Quem entrou só pelo Google pode definir uma senha em **Privacidade e conta**.
