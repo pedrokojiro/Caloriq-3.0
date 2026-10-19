@@ -10,6 +10,7 @@ const { createMailer } = require('./mailer');
 const { registerPasswordReset } = require('./password-reset');
 const { registerAccount, deviceLabel } = require('./account');
 const { registerReports } = require('./reports');
+const { registerAppVersion } = require('./app-version');
 const { validateMeal, validateMealId, validateWaterChange, validateGoals, dayBounds, historyRange } = require('./validation');
 
 const DEFAULT_LIMITS = Object.freeze({
@@ -47,7 +48,7 @@ function trustProxyFromEnv(env = process.env) {
   return /^\d+$/.test(value) ? Number(value) : value;
 }
 
-function createApp({ pool, generateContent = defaultGenerateContent, sendEmail = createMailer(), limits = {}, trustProxy = trustProxyFromEnv() }) {
+function createApp({ pool, generateContent = defaultGenerateContent, sendEmail = createMailer(), limits = {}, trustProxy = trustProxyFromEnv(), env = process.env }) {
   const app = express();
   app.set('trust proxy', trustProxy);
   const settings = { ...DEFAULT_LIMITS, ...limits };
@@ -173,6 +174,8 @@ function createApp({ pool, generateContent = defaultGenerateContent, sendEmail =
       calories: number(item.calories), protein: number(item.protein), carbs: number(item.carbs), fat: number(item.fat),
     })),
   });
+
+  registerAppVersion(app, { env });
 
   app.get('/health', async (_request, response, next) => {
     try {

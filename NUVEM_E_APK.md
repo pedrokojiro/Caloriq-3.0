@@ -78,3 +78,21 @@ A tela **Esqueci minha senha** envia um código de 6 dígitos pelo [Resend](http
 Sem domínio verificado, o Resend só entrega para o e-mail dono da conta Resend. Sem `RESEND_API_KEY`, a API não envia nada e registra um aviso no log. Para testar localmente, use `MAIL_DEV_LOG=true`: o código aparece no console da API. Nunca ative isso em produção.
 
 O código vale por 15 minutos, aceita até 5 tentativas e é guardado só como hash. Ao trocar a senha, todas as sessões da conta são encerradas.
+
+## Avisar os usuários sobre um APK novo
+
+A partir da versão 1.4.0 (versionCode 6), o app consulta `GET /api/app/version` ao abrir e mostra um aviso com o botão **Atualizar agora**.
+
+1. Aumente `expo.version` e `expo.android.versionCode` no `app.json`. O versionCode precisa sempre subir.
+2. Gere o APK: `eas build -p android --profile preview`. Ao terminar, copie o link de download que o Expo mostra.
+3. No Render, preencha as variáveis e salve (o serviço reinicia sozinho):
+
+| Variável | Exemplo | Uso |
+| --- | --- | --- |
+| `APP_LATEST_VERSION` | `1.4.0` | Texto exibido no aviso |
+| `APP_LATEST_VERSION_CODE` | `6` | Quem tem versionCode menor vê o aviso |
+| `APP_MIN_VERSION_CODE` | `5` | Opcional. Abaixo disso, o aviso não pode ser adiado |
+| `APP_DOWNLOAD_URL` | `https://expo.dev/artifacts/eas/...apk` | Link HTTPS do APK |
+| `APP_RELEASE_NOTES` | `Recuperação de senha e relatórios em PDF.` | Opcional, até 500 caracteres |
+
+O aviso opcional pode ser adiado por 3 dias. Sem essas variáveis, nada aparece. Os APKs anteriores à 1.4.0 não têm o aviso: envie o primeiro link manualmente.
