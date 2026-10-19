@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants, { AppOwnership } from 'expo-constants';
 import { Platform } from 'react-native';
+import { planNotifications, type MealReminderKey, type PlanPreferences, type TodayStatus, type WaterInterval } from '../utils/notification-plan';
 
 type NotificationsModule = typeof import('expo-notifications');
 
@@ -19,16 +20,9 @@ export function isNotificationRuntimeAvailable() {
   return !isExpoGo;
 }
 
-export type MealReminderKey = 'breakfast' | 'lunch' | 'snack' | 'dinner';
+export type { MealReminderKey, TodayStatus, WaterInterval };
 
-export type NotificationPreferences = {
-  journal: boolean;
-  streak: boolean;
-  weeklyReport: boolean;
-  aiInsights: boolean;
-  water: boolean;
-  mealReminders: Record<MealReminderKey, { enabled: boolean; time: string | null }>;
-};
+export type NotificationPreferences = PlanPreferences;
 
 const CHANNEL_ID = 'caloriq-reminders';
 const storageKey = (userId: string) => `caloriq.notification-preferences.v1.${userId}`;
@@ -39,6 +33,7 @@ export const defaultNotificationPreferences = (): NotificationPreferences => ({
   weeklyReport: false,
   aiInsights: false,
   water: false,
+  waterIntervalHours: 2,
   mealReminders: {
     breakfast: { enabled: false, time: null },
     lunch: { enabled: false, time: null },
@@ -80,6 +75,7 @@ function mergePreferences(value: unknown): NotificationPreferences {
     weeklyReport: stored.weeklyReport === true,
     aiInsights: stored.aiInsights === true,
     water: stored.water === true,
+    waterIntervalHours: ([1, 2, 3] as WaterInterval[]).includes(stored.waterIntervalHours as WaterInterval) ? stored.waterIntervalHours as WaterInterval : 2,
     mealReminders: {
       breakfast: meal('breakfast'),
       lunch: meal('lunch'),
@@ -172,108 +168,66 @@ async function cancelUserNotifications(userId: string) {
   );
 }
 
-const dailyTrigger = (notifications: NotificationsModule, time: string) => {
-  const [hour, minute] = time.split(':').map(Number);
-  return {
-    type: notifications.SchedulableTriggerInputTypes.DAILY,
-    hour,
-    minute,
-    channelId: CHANNEL_ID,
-  };
-};
+const hasAnyReminder = (prefs: NotificationPreferences) => prefs.journal || prefs.streak || prefs.weeklyReport
+  || prefs.aiInsights || prefs.water || Object.values(prefs.mealReminders).some(item => item.enabled);
 
-async function scheduleDaily(userId: string, time: string, title: string, body: string, kind: string) {
+// Os replanejamentos são serializados para que dois pedidos seguidos não dupliquem lembretes.
+let planQueue: Promise<unknown> = Promise.resolve();
+
+async function schedulePlan(userId: string, prefs: NotificationPreferences, today: TodayStatus | null) {
   const notifications = await loadNotifications();
   if (!notifications) throw new Error('development-build-required');
-  await notifications.scheduleNotificationAsync({
-    content: {
-      title,
-      body,
-      sound: 'default',
-      data: { caloriqUserId: userId, kind },
-    },
-    trigger: dailyTrigger(notifications, time),
-  });
+  await cancelUserNotifications(userId);
+  if (!hasAnyReminder(prefs)) return;
+  for (const item of planNotifications(prefs, new Date(), today)) {
+    await notifications.scheduleNotificationAsync({
+      content: { title: item.title, body: item.body, sound: 'default', data: { caloriqUserId: userId, kind: item.kind, url: item.url } },
+      trigger: { type: notifications.SchedulableTriggerInputTypes.DATE, date: item.date, channelId: CHANNEL_ID },
+    });
+  }
 }
 
-export async function saveNotificationPreferences(userId: string, preferences: NotificationPreferences) {
-  const normalized = mergePreferences(preferences);
-  const needsPermission = normalized.journal || normalized.streak || normalized.weeklyReport
-    || normalized.aiInsights || normalized.water
-    || Object.values(normalized.mealReminders).some(item => item.enabled);
+const enqueue = <T>(task: () => Promise<T>) => {
+  const run = planQueue.then(task, task);
+  planQueue = run.catch(() => undefined);
+  return run;
+};
 
-  if (needsPermission && !(await requestNotificationPermission())) {
+export async function saveNotificationPreferences(userId: string, preferences: NotificationPreferences, today: TodayStatus | null = null) {
+  const normalized = mergePreferences(preferences);
+  if (hasAnyReminder(normalized) && !(await requestNotificationPermission())) {
     throw new Error('permission-denied');
   }
-
-  await cancelUserNotifications(userId);
   await AsyncStorage.setItem(storageKey(userId), JSON.stringify(normalized));
-  if (!needsPermission) return normalized;
-
-  if (normalized.water) {
-    const notifications = await loadNotifications();
-    if (!notifications) throw new Error('development-build-required');
-    await notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Hora de se hidratar 💧',
-        body: 'Um copo de água agora ajuda você a manter sua meta do dia.',
-        sound: 'default',
-        data: { caloriqUserId: userId, kind: 'water' },
-      },
-      trigger: {
-        type: notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: 2 * 60 * 60,
-        repeats: true,
-        channelId: CHANNEL_ID,
-      },
-    });
-  }
-
-  const mealContent: Record<MealReminderKey, { title: string; body: string }> = {
-    breakfast: { title: 'Café da manhã ☀️', body: 'Registre seu café da manhã e comece o dia acompanhando suas metas.' },
-    lunch: { title: 'Hora do almoço 🍽️', body: 'Não esqueça de registrar sua refeição no CaloriQ.' },
-    snack: { title: 'Lanche da tarde 🍎', body: 'Que tal registrar seu lanche e acompanhar os nutrientes?' },
-    dinner: { title: 'Hora do jantar 🌙', body: 'Registre o jantar para completar seu diário de hoje.' },
-  };
-
-  await Promise.all((Object.keys(normalized.mealReminders) as MealReminderKey[]).map(async key => {
-    const reminder = normalized.mealReminders[key];
-    if (!reminder.enabled || !reminder.time) return;
-    const content = mealContent[key];
-    await scheduleDaily(userId, reminder.time, content.title, content.body, `meal-${key}`);
-  }));
-
-  if (normalized.journal) {
-    await scheduleDaily(userId, '21:00', 'Seu diário está completo? 📝', 'Confira se todas as refeições de hoje foram registradas.', 'journal');
-  }
-  if (normalized.streak) {
-    await scheduleDaily(userId, '21:30', 'Mantenha sua sequência 🔥', 'Abra o CaloriQ e conclua o acompanhamento de hoje.', 'streak');
-  }
-  if (normalized.aiInsights) {
-    await scheduleDaily(userId, '10:00', 'Insight do CaloriQ IA 🤖', 'Veja como suas escolhas estão contribuindo para suas metas.', 'ai-insight');
-  }
-  if (normalized.weeklyReport) {
-    const notifications = await loadNotifications();
-    if (!notifications) throw new Error('development-build-required');
-    await notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Seu resumo semanal está pronto 📊',
-        body: 'Abra o CaloriQ para conferir calorias, macros, hidratação e evolução.',
-        sound: 'default',
-        data: { caloriqUserId: userId, kind: 'weekly-report' },
-      },
-      trigger: {
-        type: notifications.SchedulableTriggerInputTypes.WEEKLY,
-        weekday: 1,
-        hour: 18,
-        minute: 0,
-        channelId: CHANNEL_ID,
-      },
-    });
-  }
+  await enqueue(() => schedulePlan(userId, normalized, today));
   return normalized;
 }
 
+// Chamado quando o app abre ou algo é registrado: refaz os próximos 7 dias
+// sem pedir permissão de novo.
+export async function refreshNotificationPlan(userId: string, today: TodayStatus | null) {
+  if (!(await getNotificationPermission())) return;
+  const prefs = await readNotificationPreferences(userId);
+  if (!hasAnyReminder(prefs)) return;
+  await enqueue(() => schedulePlan(userId, prefs, today));
+}
+
+// Abre a tela indicada na notificação tocada, inclusive quando ela abriu o app.
+export function subscribeToNotificationTaps(open: (url: string) => void) {
+  let subscription: { remove: () => void } | null = null;
+  let cancelled = false;
+  void loadNotifications().then(async notifications => {
+    if (!notifications || cancelled) return;
+    const handle = (response: { notification: { request: { content: { data?: Record<string, unknown> | null } } } } | null) => {
+      const url = response?.notification.request.content.data?.url;
+      if (typeof url === 'string' && url.startsWith('/')) open(url);
+    };
+    handle(await notifications.getLastNotificationResponseAsync());
+    if (!cancelled) subscription = notifications.addNotificationResponseReceivedListener(handle);
+  });
+  return () => { cancelled = true; subscription?.remove(); };
+}
+
 export async function cancelNotificationSchedule(userId: string) {
-  await cancelUserNotifications(userId);
+  await enqueue(() => cancelUserNotifications(userId));
 }

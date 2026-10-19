@@ -14,6 +14,8 @@ import {
   scheduleTestNotification,
   saveNotificationPreferences,
 } from '../../src/services/notifications';
+import { buildTodayStatus } from '../../src/utils/notification-plan';
+import { useAppState } from '../../src/hooks/useAppState';
 
 type ToggleKey = 'journal' | 'streak' | 'weeklyReport' | 'aiInsights';
 
@@ -64,6 +66,7 @@ function NotificationRow({
 }
 
 export default function NotificationsScreen() {
+  const { state: appState } = useAppState();
   const router = useRouter();
   const { colors, globalColors } = useTheme();
   const { user } = useAuth();
@@ -90,7 +93,7 @@ export default function NotificationsScreen() {
     setPreferences(next);
     setSaving(key);
     try {
-      const saved = await saveNotificationPreferences(user.id, next);
+      const saved = await saveNotificationPreferences(user.id, next, buildTodayStatus(appState.meals, appState.waterIntake, appState.goals.water));
       setPreferences(saved);
       setPermissionGranted(await getNotificationPermission());
     } catch (error) {
@@ -172,8 +175,8 @@ export default function NotificationsScreen() {
 
         <Card style={styles.card}>
           <Text style={[styles.sectionTitle, { color: colors.textLight }]}>Alertas e lembretes</Text>
-          <NotificationRow settingKey="journal" icon="book-outline" title="Registro de Diário" subtitle="Lembrar de conferir se as refeições do dia foram registradas" schedule="Todos os dias, às 21:00" {...rowProps('journal')} />
-          <NotificationRow settingKey="streak" icon="flame-outline" title="Conquistas e Streak" subtitle="Avisar antes do encerramento do acompanhamento diário" schedule="Todos os dias, às 21:30" {...rowProps('streak')} />
+          <NotificationRow settingKey="journal" icon="book-outline" title="Registro de Diário" subtitle="Lembrar de conferir se as refeições do dia foram registradas" schedule="Às 21:00, se o jantar ainda não foi registrado" {...rowProps('journal')} />
+          <NotificationRow settingKey="streak" icon="flame-outline" title="Conquistas e Streak" subtitle="Avisar antes do encerramento do acompanhamento diário" schedule="Às 21:30, só se o dia ainda não tiver registro" {...rowProps('streak')} />
         </Card>
 
         <Card style={styles.card}>

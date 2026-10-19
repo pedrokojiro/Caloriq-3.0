@@ -13,6 +13,8 @@ import {
   readNotificationPreferences,
   saveNotificationPreferences,
 } from '../../src/services/notifications';
+import { buildTodayStatus } from '../../src/utils/notification-plan';
+import { useAppState } from '../../src/hooks/useAppState';
 
 const meals: { key: MealReminderKey; title: string; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
   { key: 'breakfast', title: 'Café da manhã', icon: 'sunny-outline' },
@@ -22,6 +24,7 @@ const meals: { key: MealReminderKey; title: string; icon: React.ComponentProps<t
 ];
 
 export default function RemindersScreen() {
+  const { state: appState } = useAppState();
   const router = useRouter();
   const { colors, globalColors } = useTheme();
   const { user } = useAuth();
@@ -43,7 +46,7 @@ export default function RemindersScreen() {
     setPreferences(next);
     setSaving(key);
     try {
-      setPreferences(await saveNotificationPreferences(user.id, next));
+      setPreferences(await saveNotificationPreferences(user.id, next, buildTodayStatus(appState.meals, appState.waterIntake, appState.goals.water)));
       return true;
     } catch (error) {
       setPreferences(previous);
@@ -101,7 +104,7 @@ export default function RemindersScreen() {
           <Ionicons name="options-outline" size={23} color={globalColors.primary} />
           <View style={styles.introText}>
             <Text style={[styles.introTitle, { color: colors.textMain }]}>Sua rotina, seus horários</Text>
-            <Text style={[styles.introSubtitle, { color: colors.textLight }]}>Nenhum horário é pré-definido. Toque em “Definir horário” para configurar cada refeição.</Text>
+            <Text style={[styles.introSubtitle, { color: colors.textLight }]}>Nenhum horário é pré-definido. Toque em “Definir horário” para configurar cada refeição. Se você já registrou a refeição, o lembrete daquele dia não toca.</Text>
           </View>
         </View>
 
@@ -111,9 +114,28 @@ export default function RemindersScreen() {
             <View><Text style={[styles.cardTitle, { color: globalColors.primary }]}>Lembrete de água</Text><Text style={[styles.cardDescription, { color: colors.textLight }]}>Notificações periódicas durante o dia</Text></View>
           </View>
           <View style={[styles.row, { borderTopColor: colors.borderColor }]}>
-            <View style={styles.textContainer}><Text style={[styles.title, { color: colors.textMain }]}>Hidratação</Text><Text style={[styles.subtitle, { color: colors.textLight }]}>Repetir a cada 2 horas após ativar</Text></View>
+            <View style={styles.textContainer}><Text style={[styles.title, { color: colors.textMain }]}>Hidratação</Text><Text style={[styles.subtitle, { color: colors.textLight }]}>Das 8h às 21h, a cada {preferences.waterIntervalHours} h. Para quando você bate a meta do dia.</Text></View>
             {saving === 'water' ? <ActivityIndicator color={globalColors.primary} /> : <Switch value={preferences.water} disabled={loading || saving !== null} onValueChange={toggleWater} trackColor={{ false: '#CBD0D8', true: globalColors.primary }} thumbColor={Platform.OS === 'android' ? '#FFFFFF' : undefined} />}
           </View>
+          {preferences.water ? (
+            <View style={styles.intervalRow} accessibilityRole="radiogroup" accessibilityLabel="Intervalo do lembrete de água">
+              {([1, 2, 3] as const).map(hours => {
+                const selected = preferences.waterIntervalHours === hours;
+                return (
+                  <Pressable
+                    key={hours}
+                    disabled={loading || saving !== null}
+                    onPress={() => { if (!selected) void persist({ ...preferences, waterIntervalHours: hours }, 'water'); }}
+                    style={[styles.intervalChip, { borderColor: selected ? globalColors.primary : colors.borderColor, backgroundColor: selected ? `${globalColors.primary}16` : 'transparent' }]}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                  >
+                    <Text style={[styles.intervalText, { color: selected ? globalColors.primary : colors.textMuted }]}>A cada {hours} h</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
         </Card>
 
         <Card style={styles.card}>
@@ -155,6 +177,9 @@ export default function RemindersScreen() {
 }
 
 const styles = StyleSheet.create({
+  intervalRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 4, paddingBottom: 4 },
+  intervalChip: { minHeight: 40, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1.5, justifyContent: 'center' },
+  intervalText: { fontSize: 14, fontWeight: '700' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, ...Platform.select({ ios: { paddingTop: 44 } }) },
   backBtn: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '700' },

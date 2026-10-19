@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import * as SplashScreen from 'expo-splash-screen';
 import { configureNotifications } from '../src/services/notifications';
 import { UpdatePrompt } from '../src/components/UpdatePrompt';
+import { NotificationPlanner } from '../src/components/NotificationPlanner';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -70,6 +71,7 @@ export default function RootLayout() {
             <Stack.Screen name="sub-screens/notifications" />
           </Stack>
           <UpdatePrompt />
+          <NotificationPlanner />
           </AuthenticatedState>
         </AuthProvider>
       </ThemeProvider>
