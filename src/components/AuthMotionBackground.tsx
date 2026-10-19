@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { cancelAnimation, Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
+import { useTheme } from '../hooks/useTheme';
 
 export function AuthMotionBackground() {
   const { width, height } = useWindowDimensions();
@@ -9,6 +10,10 @@ export function AuthMotionBackground() {
   const ringSize = Math.min(132, Math.max(92, width * 0.28));
   const drift = useSharedValue(0);
   const reduceMotion = useReducedMotion();
+  const { isDark } = useTheme();
+  // Verde da marca translúcido: funciona sobre o fundo claro e o escuro.
+  const orb = { backgroundColor: isDark ? 'rgba(26,175,93,0.12)' : 'rgba(26,175,93,0.10)' };
+  const orbSoft = { backgroundColor: isDark ? 'rgba(26,175,93,0.08)' : 'rgba(26,175,93,0.06)' };
 
   useEffect(() => {
     if (reduceMotion) {
@@ -30,8 +35,8 @@ export function AuthMotionBackground() {
 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <Animated.View style={[styles.primaryOrb, { width: primarySize, height: primarySize, borderRadius: primarySize / 2, top: -primarySize * 0.42, right: -primarySize * 0.2 }, primaryMotion]} />
-      <Animated.View style={[styles.secondaryOrb, { width: secondarySize, height: secondarySize, borderRadius: secondarySize / 2, top: Math.min(height * 0.24, 190), left: -secondarySize * 0.48 }, secondaryMotion]} />
+      <Animated.View style={[styles.primaryOrb, orb, { width: primarySize, height: primarySize, borderRadius: primarySize / 2, top: -primarySize * 0.42, right: -primarySize * 0.2 }, primaryMotion]} />
+      <Animated.View style={[styles.secondaryOrb, orbSoft, { width: secondarySize, height: secondarySize, borderRadius: secondarySize / 2, top: Math.min(height * 0.24, 190), left: -secondarySize * 0.48 }, secondaryMotion]} />
       <Animated.View style={[styles.ring, { width: ringSize, height: ringSize, borderRadius: ringSize / 2, top: primarySize * 0.08, right: -ringSize * 0.46 }, primaryMotion]} />
     </View>
   );
@@ -40,11 +45,9 @@ export function AuthMotionBackground() {
 const styles = StyleSheet.create({
   primaryOrb: {
     position: 'absolute',
-    backgroundColor: '#E8FAF0',
   },
   secondaryOrb: {
     position: 'absolute',
-    backgroundColor: '#F2FBF6',
   },
   ring: {
     position: 'absolute',

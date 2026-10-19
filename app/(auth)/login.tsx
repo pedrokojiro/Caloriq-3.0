@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Animated, Easing, StyleSheet, Text, View, Pressable, useWindowDimensions } from 'react-native';
+import { Animated, Easing, Keyboard, StyleSheet, Text, View, Pressable, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -10,9 +10,20 @@ import { AuthMotionBackground } from '../../src/components/AuthMotionBackground'
 import { GoogleSignInButton } from '../../src/components/GoogleSignInButton';
 import { useReducedMotion } from 'react-native-reanimated';
 
+// Com o teclado aberto, o cabeçalho encolhe para o botão "Entrar" continuar visível.
+function useKeyboardVisible() {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setVisible(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
+  return visible;
+}
+
 export default function LoginScreen() {
   const router = useRouter();
-  const { globalColors } = useTheme();
+  const { colors, globalColors } = useTheme();
   const { login, loginWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,6 +32,7 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
   const { width, height } = useWindowDimensions();
   const compact = height < 720 || width < 360;
+  const keyboard = useKeyboardVisible();
   const [headerEntrance] = useState(() => new Animated.Value(0));
   const [formEntrance] = useState(() => new Animated.Value(0));
   const reduceMotion = useReducedMotion();
@@ -50,26 +62,30 @@ export default function LoginScreen() {
     }
   };
 
+  const logoSize = keyboard ? 44 : compact ? 56 : 64;
+
   return (
-    <BaseScreen scrollable style={styles.screen} contentContainerStyle={[styles.content, compact && styles.contentCompact]}>
+    <BaseScreen scrollable contentContainerStyle={[styles.content, compact && styles.contentCompact, keyboard && styles.contentKeyboard]}>
       <AuthMotionBackground />
       <View style={[styles.authPanel, width >= 600 && styles.authPanelWide]}>
-      <Animated.View style={[styles.header, {
+      <Animated.View style={[styles.header, keyboard && styles.headerKeyboard, {
         opacity: headerEntrance,
         transform: [{ translateY: headerEntrance.interpolate({ inputRange: [0, 1], outputRange: [-24, 0] }) }],
       }]}>
-        <View style={styles.logo}>
-          <Image source={require('../../assets/images/caloriq-logo.png')} style={styles.logoImage} contentFit="contain" />
+        <View style={[styles.logo, { width: logoSize, height: logoSize, borderRadius: logoSize * 0.31, backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
+          <Image source={require('../../assets/images/caloriq-logo.png')} style={{ width: logoSize * 0.78, height: logoSize * 0.78 }} contentFit="contain" accessibilityLabel="CaloriQ" />
         </View>
-        <View style={styles.brandRow}>
-          <View style={[styles.brandDot, { backgroundColor: globalColors.primary }]} />
-          <Text style={[styles.brand, { color: globalColors.primary }]}>CALORIQ</Text>
+        <View style={keyboard ? styles.headerKeyboardCopy : undefined}>
+          <View style={styles.brandRow}>
+            <View style={[styles.brandDot, { backgroundColor: globalColors.primary }]} />
+            <Text style={[styles.brand, { color: colors.brandText }]}>CALORIQ</Text>
+          </View>
+          <Text style={[styles.title, compact && styles.titleCompact, keyboard && styles.titleKeyboard, { color: colors.textMain }]}>Bem-vindo de volta</Text>
         </View>
-        <Text style={styles.title}>Bem-vindo de volta</Text>
-        <Text style={styles.subtitle}>Entre para continuar acompanhando sua alimentação.</Text>
+        {keyboard ? null : <Text style={[styles.subtitle, { color: colors.textMuted }]}>Entre para continuar acompanhando sua alimentação.</Text>}
       </Animated.View>
 
-      <Animated.View style={[styles.formCard, {
+      <Animated.View style={[styles.formCard, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }, {
         opacity: formEntrance,
         transform: [
           { translateY: formEntrance.interpolate({ inputRange: [0, 1], outputRange: [34, 0] }) },
@@ -84,8 +100,9 @@ export default function LoginScreen() {
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
-          autoComplete="off"
-          importantForAutofill="no"
+          autoComplete="email"
+          textContentType="emailAddress"
+          importantForAutofill="yes"
         />
         <Input
           label="Senha"
@@ -95,9 +112,10 @@ export default function LoginScreen() {
           secureTextEntry={!showPassword}
           autoCapitalize="none"
           autoCorrect={false}
-          autoComplete="off"
-          importantForAutofill="no"
-          rightIcon={<Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={21} color="#7B8492" />}
+          autoComplete="current-password"
+          textContentType="password"
+          importantForAutofill="yes"
+          rightIcon={<Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={22} color={colors.textMuted} />}
           onRightIconPress={() => setShowPassword(value => !value)}
         />
         <Pressable
@@ -105,10 +123,10 @@ export default function LoginScreen() {
           style={styles.forgot}
           accessibilityRole="link"
         >
-          <Text style={styles.forgotText}>Esqueci minha senha</Text>
+          <Text style={[styles.forgotText, { color: colors.brandText }]}>Esqueci minha senha</Text>
         </Pressable>
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        <Button title="Entrar na minha conta" onPress={handleLogin} loading={loading} disabled={!email.trim() || !password} style={styles.button} haptic="medium" />
+        {error ? <Text style={[styles.error, { color: colors.dangerText }]} accessibilityLiveRegion="polite">{error}</Text> : null}
+        <Button title="Entrar na minha conta" onPress={handleLogin} loading={loading} disabled={!email.trim() || !password} haptic="medium" />
         <GoogleSignInButton
           onSignIn={loginWithGoogle}
           onSuccess={user => router.replace((user.onboardingCompleted ? '/(tabs)' : '/(auth)/profile-setup') as never)}
@@ -116,35 +134,39 @@ export default function LoginScreen() {
         />
       </Animated.View>
 
-      <Animated.View style={{ opacity: formEntrance }}>
-      <Pressable onPress={() => router.push('/(auth)/register')} style={styles.footer}>
-        <Text style={styles.footerText}>Ainda não tem conta? <Text style={{ color: globalColors.primary, fontWeight: '800' }}>Criar agora</Text></Text>
-      </Pressable>
-      </Animated.View>
+      {keyboard ? null : (
+        <Animated.View style={{ opacity: formEntrance }}>
+          <Pressable onPress={() => router.push('/(auth)/register')} style={styles.footer} accessibilityRole="link">
+            <Text style={[styles.footerText, { color: colors.textMuted }]}>Ainda não tem conta? <Text style={{ color: colors.brandText, fontWeight: '800' }}>Criar agora</Text></Text>
+          </Pressable>
+        </Animated.View>
+      )}
       </View>
     </BaseScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { backgroundColor: '#FFFFFF' },
-  content: { paddingHorizontal: 24, paddingVertical: 24, flexGrow: 1, justifyContent: 'center', overflow: 'hidden' },
-  contentCompact: { paddingTop: 14, paddingBottom: 14, justifyContent: 'flex-start' },
+  content: { paddingHorizontal: 20, paddingVertical: 24, flexGrow: 1, justifyContent: 'center', overflow: 'hidden' },
+  contentCompact: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16, justifyContent: 'flex-start' },
+  contentKeyboard: { justifyContent: 'flex-start', paddingTop: 12 },
   authPanel: { width: '100%', alignSelf: 'center' },
   authPanelWide: { maxWidth: 440 },
-  header: { marginBottom: 22 },
-  logo: { width: 74, height: 74, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 14, backgroundColor: 'rgba(232,250,240,0.88)', elevation: 3, shadowColor: '#1AAF5D', shadowOpacity: 0.18, shadowRadius: 12 },
-  logoImage: { width: 62, height: 62 },
-  brandRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  brandDot: { width: 7, height: 7, borderRadius: 4, marginRight: 7 },
-  brand: { fontSize: 12, fontWeight: '900', letterSpacing: 1.4 },
-  title: { fontSize: 32, fontWeight: '900', color: '#0D1117', letterSpacing: -1, marginBottom: 8 },
-  subtitle: { fontSize: 15, lineHeight: 22, color: '#6B7585', maxWidth: 330 },
-  formCard: { borderRadius: 24, borderWidth: 1, borderColor: '#E8EAEE', backgroundColor: '#FFF', padding: 20, shadowColor: '#101828', shadowOpacity: 0.06, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 3 },
+  header: { marginBottom: 20 },
+  headerKeyboard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
+  headerKeyboardCopy: { flex: 1 },
+  logo: { alignItems: 'center', justifyContent: 'center', marginBottom: 12, borderWidth: 1 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  brandDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
+  brand: { fontSize: 12, lineHeight: 16, fontWeight: '800', letterSpacing: 1.2 },
+  title: { fontSize: 28, lineHeight: 34, fontWeight: '800', letterSpacing: -0.5, marginBottom: 8 },
+  titleCompact: { fontSize: 24, lineHeight: 30 },
+  titleKeyboard: { fontSize: 22, lineHeight: 28, marginBottom: 0 },
+  subtitle: { fontSize: 16, lineHeight: 24, maxWidth: 340 },
+  formCard: { borderRadius: 20, borderWidth: 1, padding: 16 },
   forgot: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center', paddingHorizontal: 4, marginTop: -8, marginBottom: 6 },
-  forgotText: { color: '#0E7A3E', fontSize: 14, fontWeight: '700' },
-  error: { color: '#D92D20', fontSize: 13, lineHeight: 18, marginTop: -4, marginBottom: 14 },
-  button: { marginTop: 2, height: 56 },
-  footer: { alignItems: 'center', padding: 24 },
-  footerText: { fontSize: 14, color: '#6B7585' },
+  forgotText: { fontSize: 14, fontWeight: '700' },
+  error: { fontSize: 14, lineHeight: 20, marginBottom: 12 },
+  footer: { alignItems: 'center', justifyContent: 'center', minHeight: 48, padding: 16 },
+  footerText: { fontSize: 14, lineHeight: 20 },
 });

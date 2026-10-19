@@ -12,7 +12,7 @@ import { useReducedMotion } from 'react-native-reanimated';
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { globalColors } = useTheme();
+  const { colors, globalColors } = useTheme();
   const { register, loginWithGoogle } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -54,28 +54,28 @@ export default function RegisterScreen() {
   };
 
   return (
-    <BaseScreen scrollable style={styles.screen} contentContainerStyle={[styles.content, compact && styles.contentCompact]}>
+    <BaseScreen scrollable contentContainerStyle={[styles.content, compact && styles.contentCompact]}>
       <AuthMotionBackground />
       <Animated.View style={{ opacity: headerEntrance, transform: [{ translateY: headerEntrance.interpolate({ inputRange: [0, 1], outputRange: [-22, 0] }) }] }}>
       <View style={styles.topRow}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={22} color="#0D1117" />
+        <Pressable onPress={() => router.back()} style={[styles.backButton, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]} accessibilityRole="button" accessibilityLabel="Voltar" hitSlop={4}>
+          <Ionicons name="arrow-back" size={22} color={colors.textMain} />
         </Pressable>
-        <View style={styles.logo}>
+        <View style={[styles.logo, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]}>
           <Image source={require('../../assets/images/caloriq-logo.png')} style={styles.logoImage} contentFit="contain" />
         </View>
       </View>
-      <Text style={styles.eyebrow}>PASSO 1 DE 2</Text>
-      <Text style={styles.title}>Crie sua conta</Text>
-      <Text style={styles.subtitle}>Primeiro, seus dados de acesso. Depois vamos calcular metas feitas para você.</Text>
+      <Text style={[styles.eyebrow, { color: colors.brandText }]}>PASSO 1 DE 2</Text>
+      <Text style={[styles.title, { color: colors.textMain }]}>Crie sua conta</Text>
+      <Text style={[styles.subtitle, { color: colors.textMuted }]}>Primeiro, seus dados de acesso. Depois vamos calcular metas feitas para você.</Text>
       </Animated.View>
 
-      <Animated.View style={[styles.formCard, {
+      <Animated.View style={[styles.formCard, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }, {
         opacity: formEntrance,
         transform: [{ translateY: formEntrance.interpolate({ inputRange: [0, 1], outputRange: [30, 0] }) }],
       }]}>
-        <Input label="Como podemos chamar você?" value={name} onChangeText={setName} placeholder="Seu nome" autoComplete="off" importantForAutofill="no" />
-        <Input label="E-mail" value={email} onChangeText={setEmail} placeholder="seu@email.com" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="off" importantForAutofill="no" />
+        <Input label="Como podemos chamar você?" value={name} onChangeText={setName} placeholder="Seu nome" autoComplete="name" textContentType="name" autoCapitalize="words" />
+        <Input label="E-mail" value={email} onChangeText={setEmail} placeholder="seu@email.com" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" textContentType="emailAddress" />
         <Input
           label="Senha"
           value={password}
@@ -84,13 +84,13 @@ export default function RegisterScreen() {
           secureTextEntry={!showPassword}
           autoCapitalize="none"
           autoCorrect={false}
-          autoComplete="off"
-          importantForAutofill="no"
-          rightIcon={<Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={21} color="#7B8492" />}
+          autoComplete="new-password"
+          textContentType="newPassword"
+          rightIcon={<Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={22} color={colors.textMuted} />}
           onRightIconPress={() => setShowPassword(value => !value)}
         />
-        <Input label="Confirmar senha" value={confirm} onChangeText={setConfirm} placeholder="Digite novamente" secureTextEntry={!showPassword} autoCapitalize="none" autoCorrect={false} autoComplete="off" importantForAutofill="no" />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <Input label="Confirmar senha" value={confirm} onChangeText={setConfirm} placeholder="Digite novamente" secureTextEntry={!showPassword} autoCapitalize="none" autoCorrect={false} autoComplete="new-password" textContentType="newPassword" />
+        {error ? <Text style={[styles.error, { color: colors.dangerText }]} accessibilityLiveRegion="polite">{error}</Text> : null}
         <Button title="Continuar para minhas metas" onPress={submit} loading={loading} disabled={!name.trim() || !email.trim() || password.length < 8 || !confirm} style={styles.button} haptic="medium" />
         <GoogleSignInButton
           onSignIn={loginWithGoogle}
@@ -99,33 +99,32 @@ export default function RegisterScreen() {
         />
         <View style={styles.securityRow}>
           <Ionicons name="shield-checkmark-outline" size={16} color={globalColors.primary} />
-          <Text style={styles.securityText}>Seus dados ficam vinculados somente à sua conta.</Text>
+          <Text style={[styles.securityText, { color: colors.textMuted }]}>Seus dados ficam vinculados somente à sua conta.</Text>
         </View>
       </Animated.View>
 
       <Pressable onPress={() => router.replace('/(auth)/login')} style={styles.footer}>
-        <Text style={styles.footerText}>Já tem uma conta? <Text style={{ color: globalColors.primary, fontWeight: '800' }}>Entrar</Text></Text>
+        <Text style={[styles.footerText, { color: colors.textMuted }]}>Já tem uma conta? <Text style={{ color: colors.brandText, fontWeight: '800' }}>Entrar</Text></Text>
       </Pressable>
     </BaseScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { backgroundColor: '#FFFFFF' },
   content: { paddingHorizontal: 24, paddingTop: 22, paddingBottom: 32, flexGrow: 1, overflow: 'hidden' },
   contentCompact: { paddingTop: 14, paddingBottom: 18 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 },
-  backButton: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#F4F6F8', alignItems: 'center', justifyContent: 'center' },
-  logo: { width: 54, height: 54, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EDFBF3' },
+  backButton: { width: 44, height: 44, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  logo: { width: 54, height: 54, borderRadius: 17, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   logoImage: { width: 46, height: 46 },
-  eyebrow: { color: '#1AAF5D', fontSize: 12, fontWeight: '900', letterSpacing: 1.2, marginBottom: 10 },
-  title: { fontSize: 31, fontWeight: '900', color: '#0D1117', letterSpacing: -0.9, marginBottom: 8 },
-  subtitle: { fontSize: 15, lineHeight: 22, color: '#6B7585', marginBottom: 24, maxWidth: 350 },
-  formCard: { borderRadius: 24, borderWidth: 1, borderColor: '#E8EAEE', backgroundColor: '#FFF', padding: 20, shadowColor: '#101828', shadowOpacity: 0.05, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 3 },
-  error: { color: '#D92D20', fontSize: 13, lineHeight: 18, marginTop: -4, marginBottom: 14 },
-  button: { height: 56 },
+  eyebrow: { fontSize: 12, lineHeight: 16, fontWeight: '800', letterSpacing: 1.2, marginBottom: 10 },
+  title: { fontSize: 28, lineHeight: 34, fontWeight: '800', letterSpacing: -0.5, marginBottom: 8 },
+  subtitle: { fontSize: 16, lineHeight: 24, marginBottom: 24, maxWidth: 350 },
+  formCard: { borderRadius: 20, borderWidth: 1, padding: 16 },
+  error: { fontSize: 14, lineHeight: 20, marginTop: -4, marginBottom: 14 },
+  button: { height: 52 },
   securityRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 15, gap: 6 },
-  securityText: { color: '#7B8492', fontSize: 11 },
-  footer: { alignItems: 'center', padding: 22 },
-  footerText: { fontSize: 14, color: '#6B7585' },
+  securityText: { fontSize: 12, lineHeight: 16, flexShrink: 1 },
+  footer: { alignItems: 'center', justifyContent: 'center', minHeight: 48, padding: 16 },
+  footerText: { fontSize: 14, lineHeight: 20 },
 });

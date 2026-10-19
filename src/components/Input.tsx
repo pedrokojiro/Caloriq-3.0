@@ -43,12 +43,13 @@ export const Input: React.FC<InputProps> = ({
   onFocus,
   onBlur,
 }) => {
-  const { colors, globalColors } = useTheme();
+  const { colors } = useTheme();
   const [focused, setFocused] = useState(false);
   const focusProgress = useSharedValue(0);
   const reduceMotion = useReducedMotion();
   const focusStyle = useAnimatedStyle(() => ({
-    borderColor: interpolateColor(focusProgress.value, [0, 1], [colors.inputBorder, globalColors.primary]),
+    borderColor: interpolateColor(focusProgress.value, [0, 1], [colors.inputBorder, colors.focus]),
+    borderWidth: focusProgress.value > 0.5 ? 2 : 1,
     // Keep the opaque theme background while focused. A transparent target made
     // white text disappear against light auth cards when the system used dark mode.
     backgroundColor: colors.inputBg,
@@ -63,7 +64,7 @@ export const Input: React.FC<InputProps> = ({
   return (
     <View style={[styles.container, style]}>
       {label && (
-        <Text style={[styles.label, { color: focused ? globalColors.primary : colors.textMuted }]}>{label}</Text>
+        <Text style={[styles.label, { color: focused ? colors.brandText : colors.textMuted }]}>{label}</Text>
       )}
       <Animated.View
         style={[
@@ -94,7 +95,7 @@ export const Input: React.FC<InputProps> = ({
           style={[styles.input, { color: colors.textMain }, inputStyle]}
         />
         {rightIcon && (
-          <Pressable onPress={onRightIconPress} style={styles.rightIcon}>
+          <Pressable onPress={onRightIconPress} style={styles.rightIcon} hitSlop={8} accessibilityRole="button" accessibilityLabel={secureTextEntry ? 'Mostrar senha' : 'Ocultar senha'}>
             {rightIcon}
           </Pressable>
         )}
@@ -109,13 +110,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   label: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
     marginBottom: 7,
   },
   inputWrapper: {
-    borderRadius: 14,
-    borderWidth: 1.5,
+    borderRadius: 16,
+    borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     height: 52,
@@ -123,12 +124,14 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     height: '100%',
     padding: 0,
   },
   rightIcon: {
-    marginLeft: 10,
+    marginLeft: 6,
+    minWidth: 40,
+    minHeight: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },

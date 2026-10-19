@@ -1,12 +1,20 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 
+// Tokens do sistema visual (Sprint 3, #39). Contrastes verificados (WCAG 2.1 AA):
+// texto >= 4,5:1 sobre bg/surface; bordas de campo e foco >= 3:1.
 export const COLORS = {
+  // Verde da marca: logo, anéis, barras e realces grandes. Não usar como cor de texto.
   primary: '#1AAF5D',
   primaryGlow: '#27C76B',
   primaryDark: '#158F4C',
-  
-  // Macros
+  // Verde de ação: botão primário, FAB e aba central (texto branco 4,98:1).
+  action: '#13804A',
+  actionPressed: '#0F6B3D',
+  // Gradiente do cabeçalho da Home (texto branco >= 4,98:1 em todos os pontos).
+  headerGradient: ['#13804A', '#0F6E3D', '#0A5A31'] as const,
+
+  // Macros (preenchimentos de barra; para texto use colors.protein etc.)
   protein: '#FF7A35',
   carbs: '#2563EB',
   fat: '#F59E0B',
@@ -22,31 +30,58 @@ export const COLORS = {
 export const darkTheme = {
   bgApp: '#0D1117',
   bgCard: '#1A1F2A',
-  bgNav: 'rgba(26, 31, 42, 0.95)',
+  bgNav: '#1A1F2A',
   borderColor: '#2E3340',
-  textMain: '#FFFFFF',
+  textMain: '#F5F7FA',
   textMuted: '#CBD0D8',
-  textLight: '#9AA3B0',
-  inputBg: '#0D1117',
-  inputBorder: '#2E3340',
+  textLight: '#A3ACB9',
+  inputBg: '#141922',
+  inputBorder: '#6B7585',
   statusBar: 'light-content' as 'light-content' | 'dark-content',
   shadowColor: '#000000',
   shadowOpacity: 0.3,
+  // Novos tokens
+  brandText: '#3DD68C',
+  focus: '#3DD68C',
+  disabledBg: '#262C38',
+  disabledText: '#A3ACB9',
+  dangerText: '#FF8A7A',
+  proteinText: '#FF9A62',
+  carbsText: '#7AA7FF',
+  fatText: '#FBBF24',
+  waterText: '#6FA8FF',
+  waterTint: '#293850',
+  aiTint: '#1A3030',
+  aiBorder: '#24513C',
+  track: '#2E3340',
 };
 
-export const lightTheme = {
-  bgApp: '#F8F9FA',
+export const lightTheme: typeof darkTheme = {
+  bgApp: '#F6F8F7',
   bgCard: '#FFFFFF',
-  bgNav: 'rgba(255, 255, 255, 0.95)',
-  borderColor: '#E8EAEE',
+  bgNav: '#FFFFFF',
+  borderColor: '#E3E7EA',
   textMain: '#0D1117',
-  textMuted: '#6B7585',
-  textLight: '#9AA3B0',
-  inputBg: '#F8F9FA',
-  inputBorder: '#E2E4E8',
-  statusBar: 'dark-content' as 'light-content' | 'dark-content',
+  textMuted: '#4A5565',
+  textLight: '#5F6B7A',
+  inputBg: '#F1F4F3',
+  inputBorder: '#7A8491',
+  statusBar: 'dark-content',
   shadowColor: '#000000',
   shadowOpacity: 0.04,
+  brandText: '#0E7A3E',
+  focus: '#13804A',
+  disabledBg: '#E9EDF0',
+  disabledText: '#5F6B7A',
+  dangerText: '#C4320A',
+  proteinText: '#C2410C',
+  carbsText: '#1D4ED8',
+  fatText: '#A15C07',
+  waterText: '#1D5FD1',
+  waterTint: '#E4ECF9',
+  aiTint: '#E8F7EF',
+  aiBorder: '#BFE6D0',
+  track: '#E3E7EA',
 };
 
 type ThemeType = 'light' | 'dark';

@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { StyleSheet, Text, Pressable, ActivityIndicator, ViewStyle, TextStyle, View, StyleProp } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn, FadeOut, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useTheme } from '../hooks/useTheme';
 import { motion } from '../theme/motion';
@@ -41,7 +40,9 @@ export const Button: React.FC<ButtonProps> = ({
   }, [enabled, pressed]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    opacity: withTiming(enabled ? (pressed.value ? 0.93 : 1) : 0.5, { duration: motion.duration.fast }),
+    // Desativado muda o fundo (ver getContainerStyles) em vez de apagar o conteúdo,
+    // para o texto continuar legível; o carregamento mantém a cor normal.
+    opacity: withTiming(pressed.value && enabled ? 0.93 : 1, { duration: motion.duration.fast }),
     transform: [{
       scale: reduceMotion
         ? 1
@@ -57,6 +58,7 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   const getContainerStyles = (): ViewStyle => {
+    if (disabled) return { backgroundColor: colors.disabledBg, borderWidth: 0 };
     switch (variant) {
       case 'secondary':
         return {
@@ -67,7 +69,7 @@ export const Button: React.FC<ButtonProps> = ({
       case 'outline':
         return {
           backgroundColor: 'transparent',
-          borderColor: globalColors.primary,
+          borderColor: colors.brandText,
           borderWidth: 1.5,
         };
       case 'danger':
@@ -84,16 +86,16 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   const getTextColor = (): string => {
-    if (disabled) return colors.textLight;
+    if (disabled) return colors.disabledText;
     switch (variant) {
       case 'primary':
         return '#FFFFFF';
       case 'outline':
-        return globalColors.primary;
+        return colors.brandText;
       case 'danger':
-        return globalColors.danger;
+        return colors.dangerText;
       case 'ghost':
-        return globalColors.primaryGlow;
+        return colors.brandText;
       default:
         return colors.textMain;
     }
@@ -123,14 +125,10 @@ export const Button: React.FC<ButtonProps> = ({
         disabled={disabled || loading}
         style={[styles.container, animatedStyle, style]}
       >
-        <LinearGradient
-          colors={[globalColors.primaryGlow, globalColors.primary, globalColors.primaryDark]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.gradient}
-        >
+        {/* Cor sólida de ação: o gradiente claro anterior deixava o texto branco em 2,2:1. */}
+        <View style={[styles.gradient, { backgroundColor: globalColors.action }]}>
           {renderContent()}
-        </LinearGradient>
+        </View>
       </AnimatedPressable>
     );
   }
@@ -173,8 +171,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   text: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
     letterSpacing: -0.1,
   },
 });
