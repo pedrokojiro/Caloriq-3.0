@@ -4,7 +4,7 @@ import { ActivityIndicator, StyleSheet, Text, View, Pressable, Platform } from '
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { layout } from '../../src/theme/layout';
 import { useAuth } from '../../src/context/AuthContext';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { motion } from '../../src/theme/motion';
@@ -29,17 +29,17 @@ function TabItem({ item, focused, onPress, primary, muted }: { item: TabVisual; 
     transform: [{ scale: 0.82 + active.value * 0.18 }],
   }));
   return (
-    <Pressable onPress={() => { if (!focused) void triggerHaptic('selection'); onPress(); }} style={styles.tabItem}>
+    <Pressable onPress={() => { if (!focused) void triggerHaptic('selection'); onPress(); }} style={styles.tabItem} accessibilityRole="tab" accessibilityState={{ selected: focused }} accessibilityLabel={item.label}>
       <Animated.View style={[styles.activeIndicator, { backgroundColor: `${primary}14` }, indicatorMotion]} />
       <Animated.View style={[styles.iconWrapper, iconMotion]}>
         <Ionicons name={item.icon as any} size={22} color={focused ? primary : muted} />
       </Animated.View>
-      <Text style={[styles.tabLabel, { color: focused ? primary : muted }]}>{item.label}</Text>
+      <Text style={[styles.tabLabel, { color: focused ? primary : muted }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>{item.label}</Text>
     </Pressable>
   );
 }
 
-function ScannerTabItem({ focused, onPress, primary, primaryDark, muted }: { focused: boolean; onPress: () => void; primary: string; primaryDark: string; muted: string }) {
+function ScannerTabItem({ focused, onPress, primary, action, muted }: { focused: boolean; onPress: () => void; primary: string; action: string; muted: string }) {
   const active = useSharedValue(focused ? 1 : 0);
   const pressed = useSharedValue(0);
   const reduceMotion = useReducedMotion();
@@ -56,14 +56,17 @@ function ScannerTabItem({ focused, onPress, primary, primaryDark, muted }: { foc
       onPressIn={() => { pressed.set(withSpring(1, motion.spring.button)); }}
       onPressOut={() => { pressed.set(withSpring(0, motion.spring.button)); }}
       style={styles.scannerTabItem}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: focused }}
+      accessibilityLabel="Escanear refeição"
     >
-      <Animated.View style={[styles.scannerGlow, { backgroundColor: primary }, glowMotion]} />
+      <Animated.View style={[styles.scannerGlow, { backgroundColor: action }, glowMotion]} />
       <Animated.View style={buttonMotion}>
-        <LinearGradient colors={[primary, primaryDark]} style={styles.scannerButton}>
+        <View style={[styles.scannerButton, { backgroundColor: action }]}>
           <Ionicons name="scan-outline" size={24} color="#FFFFFF" />
-        </LinearGradient>
+        </View>
       </Animated.View>
-      <Text style={[styles.tabLabel, { color: focused ? primary : muted, marginTop: 4 }]}>Escanear</Text>
+      <Text style={[styles.tabLabel, { color: focused ? primary : muted, marginTop: 4 }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>Escanear</Text>
     </Pressable>
   );
 }
@@ -83,14 +86,19 @@ export default function TabLayout() {
         tabBarShowLabel: false,
       }}
       tabBar={({ state, navigation }) => {
+        // No Scanner a barra usa o tema câmera (sempre escuro) para não criar uma faixa clara sobre a imagem.
+        const onCamera = state.routes[state.index]?.name === 'scanner';
+        const barColors = onCamera
+          ? { bg: '#0B0F0D', border: '#2A312D', active: '#3DD68C', muted: '#A3ADA7' }
+          : { bg: colors.bgNav, border: colors.borderColor, active: colors.brandText, muted: colors.textLight };
         return (
           <View
             style={[
               styles.tabBar,
               {
-                backgroundColor: colors.bgNav,
-                borderTopColor: colors.borderColor,
-                paddingBottom: Math.max(insets.bottom, 12),
+                backgroundColor: barColors.bg,
+                borderTopColor: barColors.border,
+                paddingBottom: Math.max(insets.bottom, 8),
               },
             ]}
           >
@@ -158,9 +166,9 @@ export default function TabLayout() {
                     key={route.key}
                     onPress={onPress}
                     focused={isFocused}
-                    primary={globalColors.primaryGlow}
-                    primaryDark={globalColors.primaryDark}
-                    muted={colors.textLight}
+                    primary={barColors.active}
+                    action={globalColors.action}
+                    muted={barColors.muted}
                   />
                 );
               }
@@ -171,8 +179,8 @@ export default function TabLayout() {
                   item={item}
                   focused={isFocused}
                   onPress={onPress}
-                  primary={globalColors.primary}
-                  muted={colors.textLight}
+                  primary={barColors.active}
+                  muted={barColors.muted}
                 />
               );
             })}
@@ -197,7 +205,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     borderTopWidth: 1,
-    paddingTop: 10,
+    minHeight: layout.tabBarHeight,
+    paddingTop: 6,
     zIndex: 10,
     ...Platform.select({
       ios: {
@@ -213,38 +222,40 @@ const styles = StyleSheet.create({
   },
   tabItem: {
     flex: 1,
+    minHeight: 56,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
-  activeIndicator: { position: 'absolute', top: 0, width: 44, height: 38, borderRadius: 13 },
+  activeIndicator: { position: 'absolute', top: 2, width: 56, height: 30, borderRadius: 15 },
   iconWrapper: {
-    width: 38,
-    height: 38,
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   tabLabel: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '600',
     letterSpacing: 0.1,
   },
   scannerTabItem: {
     flex: 1.2,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: -28, // Float the button above the tab bar
+    justifyContent: 'flex-end',
+    paddingBottom: 6,
+    marginTop: -24, // O botão central sobe acima da barra; o rótulo fica na mesma linha dos outros.
     position: 'relative',
   },
   scannerGlow: { position: 'absolute', top: -4, width: 60, height: 60, borderRadius: 22 },
   scannerButton: {
-    width: 52,
-    height: 52,
+    width: 56,
+    height: 56,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#1AAF5D',
+    shadowColor: '#13804A',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4,
     shadowRadius: 12,

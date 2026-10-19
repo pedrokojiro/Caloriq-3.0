@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Animated as RNAnimated, Easing, StyleSheet, Text, View, Pressable, Platform, ScrollView, useWindowDimensions } from 'react-native';
+import { Animated as RNAnimated, Easing, StyleSheet, Text, View, Pressable, ScrollView, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +11,7 @@ import { BaseScreen, Card, ProgressBar, CircularProgress, AnimatedNumber } from 
 import { motion } from '../../src/theme/motion';
 import { triggerHaptic } from '../../src/utils/haptics';
 import { formatMealTime } from '../../src/utils/time';
+import { layout } from '../../src/theme/layout';
 
 const AnimatedPressable = Reanimated.createAnimatedComponent(Pressable);
 
@@ -19,7 +21,9 @@ export default function DashboardScreen() {
   const { state, addWater } = useAppState();
   const { profile, goals, meals, waterIntake } = state;
   const { width } = useWindowDimensions();
-  const compact = width < 380;
+  // Abaixo de 360dp o cabeçalho fica compacto e o atalho de Perfil sai (já existe na aba).
+  const compact = width < 360;
+  const insets = useSafeAreaInsets();
   const [headerEntrance] = useState(() => new RNAnimated.Value(0));
   const [bodyEntrance] = useState(() => new RNAnimated.Value(0));
   const [backgroundMotion] = useState(() => new RNAnimated.Value(0));
@@ -132,156 +136,126 @@ export default function DashboardScreen() {
     addWater(amount);
   };
 
+  const firstName = (profile.name || '').trim().split(/\s+/)[0] || profile.name;
+  const caloriesOver = goals.calories > 0 ? roundedTotals.calories - goals.calories : 0;
+  const tabBarSpace = layout.tabBarHeight + Math.max(insets.bottom, 8);
+  const fabBottom = tabBarSpace + 16;
+
   return (
     <BaseScreen edges={['left', 'right']}>
-      {/* ScrollView with customized padding bottom to accommodate navigation bar */}
-      <ScrollView 
+      <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.bgApp }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* GREEN GRADIENT HEADER */}
+        {/* Cabeçalho: texto sempre branco 100% sobre o gradiente escuro (>= 4,98:1). */}
         <LinearGradient
-          colors={['#22C566', '#1AAF5D', '#0F8045']}
+          colors={globalColors.headerGradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.greenHeader}
+          style={[styles.greenHeader, { paddingTop: insets.top + (compact ? 8 : 12) }, compact && styles.greenHeaderCompact]}
         >
           <RNAnimated.View pointerEvents="none" style={[styles.headerOrbLarge, { transform: [{ translateY: orbTranslate }, { scale: orbScale }] }]} />
-          <RNAnimated.View pointerEvents="none" style={[styles.headerOrbSmall, { transform: [{ translateY: RNAnimated.multiply(orbTranslate, -0.6) }] }]} />
-          {/* Status bar offset */}
-          <View style={styles.statusBarSpacer} />
 
-          {/* User Row & Actions */}
           <RNAnimated.View style={[styles.userRow, { opacity: headerEntrance, transform: [{ translateY: headerTranslate }] }]}>
             <View style={styles.userCopy}>
               <Text style={styles.greeting}>{greeting}</Text>
-              <Text numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.72} style={[styles.username, compact && styles.usernameCompact]}>{profile.name} 👋</Text>
-              <View style={styles.streakBadge}>
-                <Text style={styles.streakText}>🔥 {profile.streak} dias seguidos</Text>
+              <Text numberOfLines={1} style={[styles.username, compact && styles.usernameCompact]} accessibilityRole="header">{firstName} 👋</Text>
+              <View style={styles.streakChip}>
+                <Ionicons name="flame" size={14} color="#FFC27A" />
+                <Text style={styles.streakText} maxFontSizeMultiplier={1.3}>{profile.streak} {profile.streak === 1 ? 'dia seguido' : 'dias seguidos'}</Text>
               </View>
             </View>
 
-            <View style={[styles.headerActions, compact && styles.headerActionsCompact]}>
-              <Pressable style={[styles.headerIcon, compact && styles.headerIconCompact]} onPress={toggleTheme}>
-                <Text style={{ fontSize: 16 }}>{theme === 'dark' ? '☀️' : '🌙'}</Text>
+            <View style={styles.headerActions}>
+              <Pressable style={styles.headerIcon} hitSlop={4} onPress={toggleTheme} accessibilityRole="button" accessibilityLabel={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}>
+                <Ionicons name={theme === 'dark' ? 'sunny-outline' : 'moon-outline'} size={20} color="#FFFFFF" />
               </Pressable>
-              <Pressable style={[styles.headerIcon, compact && styles.headerIconCompact]} onPress={() => router.push('/sub-screens/notifications')}>
-                <Ionicons name="notifications-outline" size={18} color="#FFFFFF" />
+              <Pressable style={styles.headerIcon} hitSlop={4} onPress={() => router.push('/sub-screens/notifications')} accessibilityRole="button" accessibilityLabel="Notificações">
+                <Ionicons name="notifications-outline" size={20} color="#FFFFFF" />
               </Pressable>
-              <Pressable style={[styles.headerIcon, compact && styles.headerIconCompact]} onPress={() => router.push('/(tabs)/profile')}>
-                <Ionicons name="person-outline" size={18} color="#FFFFFF" />
-              </Pressable>
+              {compact ? null : (
+                <Pressable style={styles.headerIcon} hitSlop={4} onPress={() => router.push('/(tabs)/profile')} accessibilityRole="button" accessibilityLabel="Perfil">
+                  <Ionicons name="person-outline" size={20} color="#FFFFFF" />
+                </Pressable>
+              )}
             </View>
           </RNAnimated.View>
 
-          {/* Calorie Progress Ring Card */}
-          <RNAnimated.View style={[styles.glassCard, { opacity: headerEntrance, transform: [{ scale: headerEntrance }] }]}>
-            <View style={[styles.calorieCardContent, compact && styles.calorieCardContentCompact]}>
-              <CircularProgress 
-                percentage={caloriePercentage} 
-                size={compact ? 74 : 88}
-                strokeWidth={compact ? 8 : 9}
-                color="#FFFFFF"
-                trackColor="rgba(255, 255, 255, 0.15)"
-                textColor="#FFFFFF"
-              />
-              <View style={styles.calorieCardInfo}>
-                <Text style={styles.calorieLabel}>Calorias hoje</Text>
-                <View style={styles.calorieValueContainer}>
-                  <AnimatedNumber value={roundedTotals.calories} style={[styles.calorieValue, compact && styles.calorieValueCompact]} />
-                  <Text style={styles.calorieTarget}>/ {goals.calories} kcal</Text>
-                </View>
-                <ProgressBar
-                  progress={caloriePercentage / 100}
-                  color="#FFFFFF"
-                  trackColor="rgba(255, 255, 255, 0.2)"
-                  height={5}
-                />
-                <Text style={styles.calorieRemainingText}>
-                  Faltam <Text style={{ fontWeight: '700' }}>{caloriesRemaining} kcal</Text> para sua meta
-                </Text>
+          <RNAnimated.View style={[styles.calorieCard, compact && styles.calorieCardCompact, { opacity: headerEntrance, transform: [{ scale: headerEntrance }] }]}>
+            <CircularProgress
+              percentage={caloriePercentage}
+              size={compact ? 64 : 76}
+              strokeWidth={compact ? 7 : 8}
+              color="#FFFFFF"
+              trackColor="rgba(255, 255, 255, 0.28)"
+              textColor="#FFFFFF"
+            />
+            <View style={styles.calorieCardInfo}>
+              <Text style={styles.calorieLabel}>Calorias hoje</Text>
+              <View style={styles.calorieValueContainer}>
+                <AnimatedNumber value={roundedTotals.calories} style={[styles.calorieValue, compact && styles.calorieValueCompact]} />
+                <Text style={styles.calorieTarget}>/ {goals.calories.toLocaleString('pt-BR')} kcal</Text>
               </View>
+              <ProgressBar progress={caloriePercentage / 100} color="#FFFFFF" trackColor="rgba(255, 255, 255, 0.28)" height={6} />
+              <Text style={styles.calorieRemainingText}>
+                {caloriesOver > 0
+                  ? <>Meta ultrapassada em <Text style={styles.bold}>{caloriesOver.toLocaleString('pt-BR')} kcal</Text></>
+                  : <>Faltam <Text style={styles.bold}>{caloriesRemaining.toLocaleString('pt-BR')} kcal</Text> para a meta</>}
+              </Text>
             </View>
           </RNAnimated.View>
         </LinearGradient>
 
         <RNAnimated.View style={[styles.bodyContent, { opacity: bodyEntrance, transform: [{ translateY: bodyTranslate }] }]}>
-          {/* MACROS ROW */}
           <View style={styles.macrosRow}>
-            {/* Protein */}
-            <Card style={styles.macroPill}>
-              <AnimatedNumber value={roundedTotals.protein} suffix="g" style={[styles.macroValue, { color: globalColors.protein }]} />
-              <Text style={[styles.macroLabel, { color: colors.textMuted }]}>Proteína</Text>
-              <ProgressBar
-                progress={proteinProgress}
-                color={globalColors.protein}
-                style={styles.macroProgress}
-              />
-            </Card>
-
-            {/* Carbs */}
-            <Card style={styles.macroPill}>
-              <AnimatedNumber value={roundedTotals.carbs} suffix="g" style={[styles.macroValue, { color: globalColors.carbs }]} />
-              <Text style={[styles.macroLabel, { color: colors.textMuted }]}>Carboidrato</Text>
-              <ProgressBar
-                progress={carbsProgress}
-                color={globalColors.carbs}
-                style={styles.macroProgress}
-              />
-            </Card>
-
-            {/* Fat */}
-            <Card style={styles.macroPill}>
-              <AnimatedNumber value={roundedTotals.fat} suffix="g" style={[styles.macroValue, { color: globalColors.fat }]} />
-              <Text style={[styles.macroLabel, { color: colors.textMuted }]}>Gordura</Text>
-              <ProgressBar
-                progress={fatProgress}
-                color={globalColors.fat}
-                style={styles.macroProgress}
-              />
-            </Card>
+            {([
+              ['Proteína', roundedTotals.protein, goals.protein, proteinProgress, colors.proteinText, globalColors.protein],
+              ['Carboidrato', roundedTotals.carbs, goals.carbs, carbsProgress, colors.carbsText, globalColors.carbs],
+              ['Gordura', roundedTotals.fat, goals.fat, fatProgress, colors.fatText, globalColors.fat],
+            ] as const).map(([label, value, goal, progress, textColor, barColor]) => (
+              <Card key={label} style={styles.macroPill}>
+                <AnimatedNumber value={value} suffix=" g" style={[styles.macroValue, { color: textColor }]} />
+                <Text style={[styles.macroLabel, { color: colors.textMuted }]} numberOfLines={1}>{label}</Text>
+                <Text style={[styles.macroGoal, { color: colors.textLight }]} numberOfLines={1}>de {Math.round(goal)} g</Text>
+                <ProgressBar progress={progress} color={barColor} trackColor={colors.track} style={styles.macroProgress} />
+              </Card>
+            ))}
           </View>
 
-          {/* HYDRATION TRACKER */}
+          {/* Água em duas linhas: o valor nunca encosta no título, e os botões têm 48dp. */}
           <Card style={[styles.waterCard, { borderColor: colors.borderColor }]}>
-            <Reanimated.View style={[styles.waterIconContainer, { backgroundColor: '#EEF4FF' }, waterIconMotion]}>
-              <Text style={{ fontSize: 20 }}>💧</Text>
-            </Reanimated.View>
-            <View style={styles.waterInfo}>
-              <View style={styles.waterHeaderRow}>
+            <View style={styles.waterTop}>
+              <Reanimated.View style={[styles.waterIconContainer, { backgroundColor: colors.waterTint }, waterIconMotion]}>
+                <Ionicons name="water" size={20} color={colors.waterText} />
+              </Reanimated.View>
+              <View style={styles.waterInfo}>
                 <Text style={[styles.waterTitle, { color: colors.textMain }]}>Hidratação</Text>
-                <View style={styles.waterAnimatedValue}><AnimatedNumber value={waterIntake / 1000} decimals={1} style={[styles.waterValueText, { color: globalColors.water }]} /><Text style={[styles.waterValueText, { color: globalColors.water }]}> / {(goals.water / 1000).toFixed(1)}L</Text></View>
+                <View style={styles.waterAnimatedValue}>
+                  <AnimatedNumber value={waterIntake / 1000} decimals={1} style={[styles.waterValueText, { color: colors.waterText }]} />
+                  <Text style={[styles.waterValueText, { color: colors.waterText }]}> de {(goals.water / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} L</Text>
+                </View>
               </View>
-              <ProgressBar
-                progress={waterProgress}
-                color={globalColors.water}
-              />
+              <View style={styles.waterControls}>
+                <Pressable onPress={() => changeWater(-250)} style={[styles.waterBtn, { backgroundColor: colors.waterTint }]} accessibilityRole="button" accessibilityLabel="Remover 250 ml de água">
+                  <Ionicons name="remove" size={22} color={colors.waterText} />
+                </Pressable>
+                <Pressable onPress={() => changeWater(250)} style={[styles.waterBtn, { backgroundColor: colors.waterTint }]} accessibilityRole="button" accessibilityLabel="Adicionar 250 ml de água">
+                  <Ionicons name="add" size={22} color={colors.waterText} />
+                </Pressable>
+              </View>
             </View>
-            <View style={styles.waterControls}>
-              <Pressable 
-                onPress={() => changeWater(-250)}
-                style={[styles.waterBtn, { backgroundColor: '#EEF4FF' }]}
-              >
-                <Text style={[styles.waterBtnText, { color: globalColors.water }]}>−</Text>
-              </Pressable>
-              <Pressable 
-                onPress={() => changeWater(250)}
-                style={[styles.waterBtn, { backgroundColor: '#EEF4FF' }]}
-              >
-                <Text style={[styles.waterBtnText, { color: globalColors.water }]}>+</Text>
-              </Pressable>
-            </View>
+            <ProgressBar progress={waterProgress} color={colors.waterText} trackColor={colors.track} height={6} />
           </Card>
 
           {profile.motivation ? (
-            <Pressable onPress={() => router.push('/(tabs)/goals')}>
-              <Card style={[styles.motivationCard, { borderColor: `${globalColors.primary}35` }]}>
-                <View style={[styles.motivationIcon, { backgroundColor: `${globalColors.primary}18` }]}>
-                  <Ionicons name="heart" size={19} color={globalColors.primary} />
+            <Pressable onPress={() => router.push('/(tabs)/goals')} accessibilityRole="button">
+              <Card style={[styles.motivationCard, { borderColor: colors.aiBorder }]}>
+                <View style={[styles.motivationIcon, { backgroundColor: colors.aiTint }]}>
+                  <Ionicons name="heart" size={19} color={colors.brandText} />
                 </View>
                 <View style={styles.motivationCopy}>
-                  <Text style={[styles.motivationEyebrow, { color: globalColors.primary }]}>LEMBRE-SE DO SEU PORQUÊ</Text>
+                  <Text style={[styles.motivationEyebrow, { color: colors.brandText }]}>LEMBRE-SE DO SEU PORQUÊ</Text>
                   <Text style={[styles.motivationText, { color: colors.textMain }]} numberOfLines={3}>{profile.motivation}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
@@ -289,96 +263,82 @@ export default function DashboardScreen() {
             </Pressable>
           ) : null}
 
-          {/* TODAY'S MEALS SECTION */}
           <View style={styles.mealsSection}>
-            <View style={styles.mealsHeader}>
-              <Text style={[styles.mealsTitle, { color: colors.textMain }]}>Refeições de hoje</Text>
-              <Pressable onPress={() => router.push('/(tabs)/analytics')}>
-                <Text style={[styles.seeAllText, { color: globalColors.primary }]}>Ver histórico →</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.textMain }]} accessibilityRole="header">Refeições de hoje</Text>
+              <Pressable onPress={() => router.push('/(tabs)/analytics')} style={styles.linkButton} accessibilityRole="link">
+                <Text style={[styles.linkText, { color: colors.brandText }]}>Ver histórico</Text>
               </Pressable>
             </View>
 
             {todayMeals.length === 0 ? (
               <Card style={styles.emptyMealsCard}>
-                <Text style={[styles.emptyMealsText, { color: colors.textMuted }]}>
-                  Nenhuma refeição registrada hoje.
-                </Text>
+                <Text style={[styles.emptyMealsText, { color: colors.textMuted }]}>Nenhuma refeição registrada hoje.</Text>
               </Card>
             ) : (
               todayMeals.map((meal, index) => (
                 <Reanimated.View key={meal.id} entering={FadeInUp.delay(index * motion.stagger.short).duration(motion.duration.normal)} layout={LinearTransition.duration(motion.duration.normal)}>
-                <Card
-                  style={[styles.mealCard, { borderColor: colors.borderColor }]}
-                  onPress={() => router.push({
-                    pathname: '/(modals)/meal-edit',
-                    params: { mealId: meal.id }
-                  })}
-                >
-                  <View style={styles.mealCardRow}>
-                    <View style={[styles.mealEmojiContainer, { backgroundColor: colors.inputBg }]}>
-                      <Text style={{ fontSize: 24 }}>{meal.emoji}</Text>
+                  <Card
+                    style={[styles.mealCard, { borderColor: colors.borderColor }]}
+                    onPress={() => router.push({ pathname: '/(modals)/meal-edit', params: { mealId: meal.id } })}
+                  >
+                    <View style={styles.mealCardRow}>
+                      <View style={[styles.mealEmojiContainer, { backgroundColor: colors.inputBg }]}>
+                        <Text style={styles.mealEmoji}>{meal.emoji}</Text>
+                      </View>
+                      <View style={styles.mealInfo}>
+                        <Text style={[styles.mealName, { color: colors.textMain }]} numberOfLines={2}>{meal.name}</Text>
+                        <Text style={[styles.mealMeta, { color: colors.textMuted }]}>{meal.type} · {formatMealTime(meal.consumedAt, meal.time)}</Text>
+                        <Text style={[styles.mealMacros, { color: colors.textLight }]}>
+                          P {Math.round(meal.protein * meal.portions)} g · C {Math.round(meal.carbs * meal.portions)} g · G {Math.round(meal.fat * meal.portions)} g
+                        </Text>
+                      </View>
+                      <View style={styles.mealCaloriesContainer}>
+                        <Text style={[styles.mealCaloriesValue, { color: colors.textMain }]}>{Math.round(meal.calories * meal.portions)}</Text>
+                        <Text style={[styles.mealCaloriesLabel, { color: colors.textLight }]}>kcal</Text>
+                      </View>
                     </View>
-                    <View style={styles.mealInfo}>
-                      <Text style={[styles.mealName, { color: colors.textMain }]}>{meal.name}</Text>
-                      <Text style={[styles.mealMeta, { color: colors.textMuted }]}>
-                        {meal.type} · {formatMealTime(meal.consumedAt, meal.time)}
-                      </Text>
-                      <Text style={[styles.mealMacros, { color: colors.textLight }]}>
-                        P: {Math.round(meal.protein * meal.portions)}g  C: {Math.round(meal.carbs * meal.portions)}g  G: {Math.round(meal.fat * meal.portions)}g
-                      </Text>
-                    </View>
-                    <View style={styles.mealCaloriesContainer}>
-                      <Text style={[styles.mealCaloriesValue, { color: colors.textMain }]}>
-                        {Math.round(meal.calories * meal.portions)}
-                      </Text>
-                      <Text style={[styles.mealCaloriesLabel, { color: colors.textLight }]}>kcal</Text>
-                    </View>
-                  </View>
-                </Card>
+                  </Card>
                 </Reanimated.View>
               ))
             )}
 
-            <Pressable 
+            {/* Mesmo destino da aba central (Scanner); rótulo alinhado ao destino. */}
+            <Pressable
               onPress={() => router.push('/(tabs)/scanner')}
-              style={[styles.registerMealBtn, { borderColor: globalColors.primary }]}
+              style={({ pressed }) => [styles.registerMealBtn, { borderColor: colors.brandText }, pressed && { backgroundColor: colors.aiTint }]}
+              accessibilityRole="button"
             >
-              <Ionicons name="scan-outline" size={18} color={globalColors.primary} style={{ marginRight: 8 }} />
-              <Text style={[styles.registerMealBtnText, { color: globalColors.primary }]}>
-                Registrar refeição
-              </Text>
+              <Ionicons name="scan-outline" size={20} color={colors.brandText} />
+              <Text style={[styles.registerMealBtnText, { color: colors.brandText }]}>Escanear refeição</Text>
+            </Pressable>
+            {/* Proposta B: registro manual pelo formulário de refeição que já existe. */}
+            <Pressable onPress={() => router.push('/(modals)/meal-edit')} style={styles.manualButton} accessibilityRole="button">
+              <Ionicons name="create-outline" size={18} color={colors.brandText} />
+              <Text style={[styles.linkText, { color: colors.brandText }]}>Adicionar manualmente</Text>
             </Pressable>
           </View>
 
-          {/* AI INSIGHT */}
-          <Card 
-            style={[styles.insightCard, { backgroundColor: theme === 'dark' ? 'rgba(39,199,107,0.06)' : 'rgba(39,199,107,0.12)', borderColor: 'rgba(39,199,107,0.2)' }]}
-            onPress={() => router.push('/(modals)/ai-chat')}
-          >
-            <View style={[styles.insightIconContainer, { backgroundColor: globalColors.primary }]}>
-              <Text style={{ fontSize: 18 }}>🤖</Text>
+          <Card style={[styles.insightCard, { backgroundColor: colors.aiTint, borderColor: colors.aiBorder }]} onPress={() => router.push('/(modals)/ai-chat')}>
+            <View style={[styles.insightIconContainer, { backgroundColor: globalColors.action }]}>
+              <Ionicons name="sparkles" size={20} color="#FFFFFF" />
             </View>
             <View style={styles.insightContent}>
               <View style={styles.insightHeaderRow}>
-                <Text style={[styles.insightTitle, { color: theme === 'dark' ? '#27C76B' : '#0F6E3A' }]}>
-                  Insight da IA
-                </Text>
-                <View style={[styles.insightBadge, { backgroundColor: 'rgba(39,199,107,0.2)' }]}>
-                  <Text style={[styles.insightBadgeText, { color: globalColors.primary }]}>Conversar</Text>
+                <Text style={[styles.insightTitle, { color: colors.brandText }]}>Insight da IA</Text>
+                <View style={[styles.insightBadge, { borderColor: colors.brandText }]}>
+                  <Text style={[styles.insightBadgeText, { color: colors.brandText }]} maxFontSizeMultiplier={1.3}>Conversar</Text>
                 </View>
               </View>
-              <Text style={[styles.insightDesc, { color: theme === 'dark' ? '#CBD0D8' : '#0F6E3A' }]}>
-                {proteinInsight}
-              </Text>
+              <Text style={[styles.insightDesc, { color: colors.textMain }]}>{proteinInsight}</Text>
             </View>
           </Card>
 
-          {/* WEEKLY CHART */}
           <View style={styles.chartSection}>
-            <View style={styles.chartHeader}>
-              <Text style={[styles.chartTitle, { color: colors.textMain }]}>Minha semana</Text>
-              <Pressable onPress={() => router.push('/(tabs)/analytics')}>
-                <Text style={[styles.seeAllText, { color: globalColors.primary }]}>Ver tudo →</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.textMain }]} accessibilityRole="header">Minha semana</Text>
+              <Pressable onPress={() => router.push('/(tabs)/analytics')} style={styles.linkButton} accessibilityRole="link">
+                <Text style={[styles.linkText, { color: colors.brandText }]}>Ver tudo</Text>
               </Pressable>
             </View>
             <Card style={[styles.chartCard, { borderColor: colors.borderColor }]}>
@@ -393,14 +353,11 @@ export default function DashboardScreen() {
                         {
                           height,
                           borderColor: globalColors.primary,
-                          backgroundColor: day.isToday ? `${globalColors.primary}10` : globalColors.primary,
-                          opacity: day.calories > 0 ? (day.isToday ? 1 : 0.72) : 0.2,
+                          backgroundColor: day.isToday ? `${globalColors.primary}20` : globalColors.primary,
+                          opacity: day.calories > 0 ? 1 : 0.25,
                         },
                       ]} />
-                      <Text style={[
-                        day.isToday ? styles.chartBarLabelToday : styles.chartBarLabel,
-                        { color: day.isToday ? globalColors.primary : colors.textLight },
-                      ]}>{day.label}</Text>
+                      <Text style={[styles.chartBarLabel, { color: day.isToday ? colors.brandText : colors.textLight }, day.isToday && styles.chartBarLabelToday]} maxFontSizeMultiplier={1.3}>{day.label}</Text>
                     </View>
                   );
                 })}
@@ -408,23 +365,24 @@ export default function DashboardScreen() {
               <View style={styles.chartSummary}>
                 <View style={[styles.chartSummaryDot, { backgroundColor: globalColors.primary }]} />
                 <Text style={[styles.chartSummaryText, { color: colors.textLight }]}>
-                  Média dos últimos 7 dias: {weekAverage} kcal · Meta: {goals.calories} kcal
+                  Média dos últimos 7 dias: {weekAverage.toLocaleString('pt-BR')} kcal · Meta: {goals.calories.toLocaleString('pt-BR')} kcal
                 </Text>
               </View>
             </Card>
           </View>
-          
-          {/* Scroll view safe margin at the bottom */}
-          <View style={styles.bottomSpacer} />
+
+          {/* Espaço para a barra de abas e o FAB: o último card nunca termina escondido. */}
+          <View style={{ height: tabBarSpace + layout.fabSize + 24 }} />
         </RNAnimated.View>
       </ScrollView>
 
-      {/* Botão Flutuante (FAB) do Chat IA */}
       <AnimatedPressable
-        style={[styles.fab, { backgroundColor: globalColors.primary }, fabMotion]}
+        style={[styles.fab, { backgroundColor: globalColors.action, bottom: fabBottom }, fabMotion]}
         onPressIn={() => { fabPressed.value = 1; }}
         onPressOut={() => { fabPressed.value = 0; }}
         onPress={() => { void triggerHaptic('medium'); router.push('/(modals)/ai-chat'); }}
+        accessibilityRole="button"
+        accessibilityLabel="Conversar com a IA"
       >
         <Ionicons name="chatbubbles" size={24} color="#FFFFFF" />
       </AnimatedPressable>
@@ -433,463 +391,90 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
-  greenHeader: {
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  headerOrbLarge: {
-    position: 'absolute',
-    width: 210,
-    height: 210,
-    borderRadius: 105,
-    backgroundColor: 'rgba(255,255,255,0.09)',
-    top: -82,
-    right: -72,
-  },
-  headerOrbSmall: {
-    position: 'absolute',
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    borderWidth: 18,
-    borderColor: 'rgba(255,255,255,0.07)',
-    left: -36,
-    bottom: 24,
-  },
-  statusBarSpacer: {
-    height: Platform.OS === 'ios' ? 44 : 28,
-  },
-  userRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 20,
-    marginTop: 8,
-  },
-  userCopy: {
-    flex: 1,
-    minWidth: 0,
-    paddingRight: 10,
-  },
-  greeting: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.72)',
-    fontWeight: '500',
-  },
-  username: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: -0.6,
-  },
-  usernameCompact: {
-    fontSize: 22,
-    lineHeight: 26,
-  },
-  streakBadge: {
-    marginTop: 8,
-    alignSelf: 'flex-start',
-    backgroundColor: '#FF7A35',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 100,
-    shadowColor: '#F56520',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  streakText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  headerActionsCompact: {
-    gap: 5,
-  },
-  headerIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerIconCompact: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-  },
-  glassCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.13)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 20,
-    padding: 18,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000000',
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 4 },
-      },
-    }),
-  },
-  calorieCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 20,
-  },
-  calorieCardContentCompact: {
-    gap: 12,
-  },
-  calorieCardInfo: {
-    flex: 1,
-  },
-  calorieLabel: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  calorieValueContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 4,
-    marginBottom: 12,
-  },
-  calorieValue: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: -1,
-  },
-  calorieValueCompact: {
-    fontSize: 26,
-  },
-  calorieTarget: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.6)',
-  },
-  calorieRemainingText: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.65)',
-    marginTop: 6,
-  },
-  bodyContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-  },
-  macrosRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  macroPill: {
-    flex: 1,
-    padding: 12,
-    alignItems: 'center',
-  },
-  macroValue: {
-    fontSize: 17,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  macroLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  macroProgress: {
-    marginTop: 7,
-    width: '100%',
-  },
-  waterCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    marginBottom: 12,
-  },
-  waterIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  waterInfo: {
-    flex: 1,
-    marginHorizontal: 12,
-  },
-  waterHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  waterTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  waterValueText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  waterAnimatedValue: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  waterControls: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  motivationCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 15,
-    borderWidth: 1,
-    marginBottom: 20,
-  },
-  motivationIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  motivationCopy: { flex: 1 },
-  motivationEyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 0.8, marginBottom: 4 },
-  motivationText: { fontSize: 13, lineHeight: 18, fontWeight: '700', paddingRight: 8 },
-  waterBtn: {
-    width: 34,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  waterBtnText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  mealsSection: {
-    marginVertical: 12,
-  },
-  mealsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  mealsTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    letterSpacing: -0.4,
-  },
-  seeAllText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  emptyMealsCard: {
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyMealsText: {
-    fontSize: 14,
-  },
-  mealCard: {
-    padding: 15,
-    marginBottom: 10,
-  },
-  mealCardRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  mealEmojiContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  mealInfo: {
-    flex: 1,
-  },
-  mealName: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  mealMeta: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  mealMacros: {
-    fontSize: 11,
-    marginTop: 4,
-  },
-  mealCaloriesContainer: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-  },
-  mealCaloriesValue: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  mealCaloriesLabel: {
-    fontSize: 11,
-    marginTop: 1,
-  },
-  registerMealBtn: {
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderRadius: 16,
-    height: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-    width: '100%',
-  },
-  registerMealBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  insightCard: {
-    flexDirection: 'row',
-    padding: 15,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  insightIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  insightContent: {
-    flex: 1,
-  },
-  insightHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 3,
-  },
-  insightTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  insightBadge: {
-    borderRadius: 100,
-    paddingHorizontal: 8,
-    paddingVertical: 1,
-  },
-  insightBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  insightDesc: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  chartSection: {
-    marginVertical: 12,
-  },
-  chartHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  chartTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    letterSpacing: -0.4,
-  },
-  chartCard: {
-    padding: 16,
-  },
-  chartBarsContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    height: 80,
-    gap: 6,
-  },
-  chartBarCol: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
-  },
-  chartBarFill: {
-    width: '100%',
-    borderRadius: 6,
-  },
-  chartBarToday: {
-    width: '100%',
-    borderRadius: 6,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-  },
-  chartBarLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  chartBarLabelToday: {
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  chartSummary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 10,
-  },
-  chartSummaryDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 2,
-  },
-  chartSummaryText: {
-    fontSize: 11,
-  },
-  bottomSpacer: {
-    height: 100, // Reserve space so bottom tabs don't cut off anything
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 90,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 5,
-    elevation: 8,
-    zIndex: 999,
-  },
+  scroll: { flex: 1 },
+  scrollContent: { flexGrow: 1 },
+  greenHeader: { paddingHorizontal: 16, paddingBottom: 18, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden', position: 'relative' },
+  greenHeaderCompact: { paddingBottom: 14 },
+  headerOrbLarge: { position: 'absolute', width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(26,175,93,0.35)', top: -110, right: -90 },
+  userRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
+  userCopy: { flex: 1, minWidth: 0, paddingRight: 8 },
+  greeting: { fontSize: 14, lineHeight: 20, color: '#FFFFFF', fontWeight: '500' },
+  username: { fontSize: 22, lineHeight: 28, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.3 },
+  usernameCompact: { fontSize: 20, lineHeight: 26 },
+  streakChip: { marginTop: 8, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.18)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
+  streakText: { color: '#FFFFFF', fontSize: 12, lineHeight: 16, fontWeight: '700' },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  headerIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.14)', alignItems: 'center', justifyContent: 'center' },
+  calorieCard: { flexDirection: 'row', alignItems: 'center', gap: 16, padding: 14, paddingHorizontal: 16, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.12)' },
+  calorieCardCompact: { gap: 12, padding: 12 },
+  calorieCardInfo: { flex: 1, minWidth: 0, gap: 4 },
+  calorieLabel: { fontSize: 14, lineHeight: 20, color: '#FFFFFF', fontWeight: '600' },
+  calorieValueContainer: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 6 },
+  calorieValue: { fontSize: 32, lineHeight: 36, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.5 },
+  calorieValueCompact: { fontSize: 28, lineHeight: 32 },
+  calorieTarget: { fontSize: 14, lineHeight: 20, color: '#FFFFFF', fontWeight: '500' },
+  calorieRemainingText: { fontSize: 14, lineHeight: 20, color: '#FFFFFF', marginTop: 2 },
+  bold: { fontWeight: '800' },
+  bodyContent: { paddingHorizontal: 16, paddingTop: 16, gap: 12 },
+  macrosRow: { flexDirection: 'row', gap: 8 },
+  macroPill: { flex: 1, minWidth: 0, paddingVertical: 12, paddingHorizontal: 8, alignItems: 'center', gap: 2 },
+  macroValue: { fontSize: 20, lineHeight: 24, fontWeight: '800' },
+  macroLabel: { fontSize: 12, lineHeight: 16, fontWeight: '600' },
+  macroGoal: { fontSize: 12, lineHeight: 16 },
+  macroProgress: { width: '100%', marginTop: 6 },
+  waterCard: { padding: 14, gap: 10, borderWidth: 1 },
+  waterTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  waterIconContainer: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  waterInfo: { flex: 1, minWidth: 0 },
+  waterTitle: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
+  waterAnimatedValue: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap' },
+  waterValueText: { fontSize: 14, lineHeight: 20, fontWeight: '700' },
+  waterControls: { flexDirection: 'row', gap: 4 },
+  waterBtn: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  motivationCard: { padding: 14, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  motivationIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  motivationCopy: { flex: 1, minWidth: 0 },
+  motivationEyebrow: { fontSize: 12, lineHeight: 16, fontWeight: '800', letterSpacing: 0.6, marginBottom: 2 },
+  motivationText: { fontSize: 14, lineHeight: 20, fontWeight: '700' },
+  mealsSection: { gap: 10, marginTop: 8 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  sectionTitle: { fontSize: 20, lineHeight: 26, fontWeight: '800', letterSpacing: -0.2, flexShrink: 1 },
+  linkButton: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 4 },
+  linkText: { fontSize: 14, lineHeight: 20, fontWeight: '700' },
+  emptyMealsCard: { padding: 20, alignItems: 'center' },
+  emptyMealsText: { fontSize: 14, lineHeight: 20 },
+  mealCard: { padding: 12, paddingHorizontal: 14, borderWidth: 1 },
+  mealCardRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  mealEmojiContainer: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  mealEmoji: { fontSize: 24 },
+  mealInfo: { flex: 1, minWidth: 0 },
+  mealName: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
+  mealMeta: { fontSize: 14, lineHeight: 20 },
+  mealMacros: { fontSize: 12, lineHeight: 16, marginTop: 1 },
+  mealCaloriesContainer: { alignItems: 'flex-end' },
+  mealCaloriesValue: { fontSize: 20, lineHeight: 24, fontWeight: '800' },
+  mealCaloriesLabel: { fontSize: 12, lineHeight: 16 },
+  registerMealBtn: { minHeight: 52, borderRadius: 16, borderWidth: 1.5, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16 },
+  registerMealBtnText: { fontSize: 16, fontWeight: '700' },
+  manualButton: { alignSelf: 'center', minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8 },
+  insightCard: { padding: 14, borderWidth: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  insightIconContainer: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  insightContent: { flex: 1, minWidth: 0, gap: 4 },
+  insightHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  insightTitle: { fontSize: 14, lineHeight: 20, fontWeight: '800' },
+  insightBadge: { borderWidth: 1.5, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  insightBadgeText: { fontSize: 12, lineHeight: 16, fontWeight: '700' },
+  insightDesc: { fontSize: 14, lineHeight: 20 },
+  chartSection: { gap: 10, marginTop: 8 },
+  chartCard: { padding: 16, borderWidth: 1 },
+  chartBarsContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 104 },
+  chartBarCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
+  chartBarFill: { width: 18, borderRadius: 6 },
+  chartBarToday: { width: 18, borderRadius: 6, borderWidth: 2, borderStyle: 'dashed' },
+  chartBarLabel: { fontSize: 12, lineHeight: 16, fontWeight: '600' },
+  chartBarLabelToday: { fontWeight: '800' },
+  chartSummary: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
+  chartSummaryDot: { width: 8, height: 8, borderRadius: 2 },
+  chartSummaryText: { fontSize: 12, lineHeight: 16, flexShrink: 1 },
+  fab: { position: 'absolute', right: 16, width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', shadowColor: '#000000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.22, shadowRadius: 10, elevation: 8, zIndex: 20 },
 });
