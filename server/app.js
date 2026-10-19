@@ -11,6 +11,8 @@ const { registerPasswordReset } = require('./password-reset');
 const { registerAccount, deviceLabel } = require('./account');
 const { registerReports } = require('./reports');
 const { registerAppVersion } = require('./app-version');
+const { createStorage } = require('./storage');
+const { registerPhotos, collectUserPhotoPaths } = require('./photos');
 const { validateMeal, validateMealId, validateWaterChange, validateGoals, dayBounds, historyRange } = require('./validation');
 
 const DEFAULT_LIMITS = Object.freeze({
@@ -24,6 +26,7 @@ const DEFAULT_LIMITS = Object.freeze({
   forgotEmail: { limit: 3, windowMs: 15 * 60 * 1000 },
   resetIp: { limit: 10, windowMs: 15 * 60 * 1000 },
   accountPassword: { limit: 10, windowMs: 15 * 60 * 1000 },
+  photoUpload: { limit: 30, windowMs: 60 * 60 * 1000 },
 });
 
 // No Render a requisição passa por um único proxy, que informa o IP real em
@@ -48,7 +51,7 @@ function trustProxyFromEnv(env = process.env) {
   return /^\d+$/.test(value) ? Number(value) : value;
 }
 
-function createApp({ pool, generateContent = defaultGenerateContent, sendEmail = createMailer(), limits = {}, trustProxy = trustProxyFromEnv(), env = process.env }) {
+function createApp({ pool, generateContent = defaultGenerateContent, sendEmail = createMailer(), limits = {}, trustProxy = trustProxyFromEnv(), env = process.env, storage = createStorage() }) {
   const app = express();
   app.set('trust proxy', trustProxy);
   const settings = { ...DEFAULT_LIMITS, ...limits };
@@ -186,7 +189,12 @@ function createApp({ pool, generateContent = defaultGenerateContent, sendEmail =
 
   app.use('/api', rateLimit(authIpLimiter, request => request.ip, tooManyAuthRequests), authenticate);
 
-  registerAccount(app, { pool, limits: settings });
+  registerAccount(app, {
+    pool, limits: settings,
+    collectFiles: userId => (storage.enabled ? collectUserPhotoPaths(pool, userId) : Promise.resolve([])),
+    removeFiles: paths => storage.remove(paths),
+  });
+  registerPhotos(app, { pool, storage, limits: settings });
   registerReports(app, { pool });
 
   app.get('/api/auth/me', (request, response) => {

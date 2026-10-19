@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { BaseScreen, Button, Card } from '../../src/components';
 import { useAppState } from '../../src/hooks/useAppState';
 import { useTheme } from '../../src/hooks/useTheme';
-import { deleteProgressPhoto, readProgressPhotos, saveProgressPhoto, type ProgressPhoto, type ProgressPhotoAngle } from '../../src/services/progress-photos';
+import { deleteProgressPhoto, readProgressPhotos, saveProgressPhoto, setCloudBackupEnabled, type ProgressPhoto, type ProgressPhotoAngle } from '../../src/services/progress-photos';
 
 const angles: { value: ProgressPhotoAngle; label: string }[] = [
   { value: 'front', label: 'Frente' }, { value: 'side', label: 'Lado' }, { value: 'back', label: 'Costas' },
@@ -21,9 +21,32 @@ export default function VisualProgressScreen() {
   const [angle, setAngle] = useState<ProgressPhotoAngle>('front');
   const [selected, setSelected] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [cloudEnabled, setCloudEnabled] = useState(false);
+  const [cloudError, setCloudError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const filteredPhotos = photos.filter(photo => photo.angle === angle);
 
-  useEffect(() => { void readProgressPhotos().then(setPhotos); }, []);
+  useEffect(() => {
+    let active = true;
+    readProgressPhotos().then(library => {
+      if (!active) return;
+      setPhotos(library.photos);
+      setCloudEnabled(library.cloudEnabled);
+      setCloudError(library.cloudError);
+    });
+    return () => { active = false; };
+  }, []);
+
+  const toggleCloud = async (enabled: boolean) => {
+    setSyncing(true);
+    setCloudEnabled(enabled);
+    try {
+      await setCloudBackupEnabled(enabled);
+      const library = await readProgressPhotos();
+      setPhotos(library.photos);
+      setCloudError(library.cloudError);
+    } finally { setSyncing(false); }
+  };
 
   const persistAsset = async (asset?: ImagePicker.ImagePickerAsset) => {
     if (!asset?.uri) return;
@@ -54,7 +77,7 @@ export default function VisualProgressScreen() {
     ? current.filter(item => item !== id)
     : current.length < 2 ? [...current, id] : [current[1], id]);
 
-  const remove = (photo: ProgressPhoto) => Alert.alert('Apagar esta foto?', 'A imagem será removida permanentemente deste aparelho.', [
+  const remove = (photo: ProgressPhoto) => Alert.alert('Apagar esta foto?', photo.source === 'cloud' ? 'A imagem será removida permanentemente da nuvem e de todos os seus aparelhos.' : 'A imagem será removida permanentemente deste aparelho.', [
     { text: 'Cancelar', style: 'cancel' },
     { text: 'Apagar', style: 'destructive', onPress: () => void deleteProgressPhoto(photo).then(() => {
       setPhotos(current => current.filter(item => item.id !== photo.id));
@@ -78,8 +101,25 @@ export default function VisualProgressScreen() {
 
       <ScrollView contentContainerStyle={[styles.content, { backgroundColor: colors.bgApp }]} showsVerticalScrollIndicator={false}>
         <Card style={[styles.privacyCard, { borderColor: `${globalColors.primary}35` }]}>
-          <View style={[styles.privacyIcon, { backgroundColor: `${globalColors.primary}16` }]}><Ionicons name="lock-closed" size={20} color={globalColors.primary} /></View>
-          <View style={styles.privacyCopy}><Text style={[styles.privacyTitle, { color: colors.textMain }]}>Privado por padrão</Text><Text style={[styles.privacyText, { color: colors.textLight }]}>Estas fotos ficam somente no espaço privado deste aplicativo no aparelho. A IA não analisa nem envia as imagens.</Text></View>
+          <View style={[styles.privacyIcon, { backgroundColor: `${globalColors.primary}16` }]}><Ionicons name={cloudEnabled ? 'cloud-done-outline' : 'lock-closed'} size={20} color={globalColors.primary} /></View>
+          <View style={styles.privacyCopy}>
+            <Text style={[styles.privacyTitle, { color: colors.textMain }]}>Guardar na nuvem</Text>
+            <Text style={[styles.privacyText, { color: colors.textMuted }]}>
+              {cloudEnabled
+                ? 'Suas fotos ficam em um armazenamento privado vinculado à sua conta e voltam se você trocar de aparelho. A IA não analisa as imagens.'
+                : 'Desligado: as fotos ficam só neste aparelho e se perdem se o app for desinstalado. A IA não analisa as imagens.'}
+            </Text>
+            {cloudError ? <Text style={[styles.privacyText, { color: '#A15C07', marginTop: 6 }]}>{cloudError}</Text> : null}
+          </View>
+          {syncing ? <ActivityIndicator color={globalColors.primary} /> : (
+            <Switch
+              value={cloudEnabled}
+              onValueChange={value => { void toggleCloud(value); }}
+              trackColor={{ false: '#CBD0D8', true: globalColors.primary }}
+              thumbColor={Platform.OS === 'android' ? '#FFFFFF' : undefined}
+              accessibilityLabel="Guardar fotos na nuvem"
+            />
+          )}
         </Card>
 
         <Text style={[styles.sectionTitle, { color: colors.textMain }]}>Novo registro</Text>
@@ -105,7 +145,7 @@ export default function VisualProgressScreen() {
             const isSelected = selected.includes(photo.id);
             return <View key={photo.id} style={[styles.photoCard, { backgroundColor: colors.bgCard, borderColor: isSelected ? globalColors.primary : colors.borderColor }]}>
               <Pressable onPress={() => toggleSelected(photo.id)}><Image source={{ uri: photo.uri }} style={styles.photo} /><View style={[styles.selectBadge, { backgroundColor: isSelected ? globalColors.primary : 'rgba(5,12,8,0.62)' }]}><Ionicons name={isSelected ? 'checkmark' : 'add'} size={16} color="#FFF" /></View></Pressable>
-              <View style={styles.photoInfo}><View><Text style={[styles.photoDate, { color: colors.textMain }]}>{new Date(photo.createdAt).toLocaleDateString('pt-BR')}</Text><Text style={[styles.photoMeta, { color: colors.textLight }]}>{angleLabel[photo.angle]}{photo.weight ? ` · ${photo.weight} kg` : ''}</Text></View><Pressable onPress={() => remove(photo)} style={styles.deleteButton}><Ionicons name="trash-outline" size={18} color="#E5484D" /></Pressable></View>
+              <View style={styles.photoInfo}><View><Text style={[styles.photoDate, { color: colors.textMain }]}>{new Date(photo.createdAt).toLocaleDateString('pt-BR')}</Text><Text style={[styles.photoMeta, { color: colors.textMuted }]}><Ionicons name={photo.source === 'cloud' ? 'cloud-done-outline' : 'phone-portrait-outline'} size={12} /> {angleLabel[photo.angle]}{photo.weight ? ` · ${photo.weight} kg` : ''}</Text></View><Pressable onPress={() => remove(photo)} style={styles.deleteButton}><Ionicons name="trash-outline" size={18} color="#E5484D" /></Pressable></View>
             </View>;
           })}</View>
         )}
@@ -122,11 +162,11 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: '900' },
   headerSubtitle: { fontSize: 10, marginTop: 2 },
   content: { flexGrow: 1, width: '100%', maxWidth: 760, alignSelf: 'center', padding: 18 },
-  privacyCard: { padding: 15, borderWidth: 1, flexDirection: 'row', marginBottom: 23 },
-  privacyIcon: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  privacyCard: { padding: 15, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 23 },
+  privacyIcon: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginRight: 2 },
   privacyCopy: { flex: 1 },
-  privacyTitle: { fontSize: 13, fontWeight: '900' },
-  privacyText: { fontSize: 10, lineHeight: 15, marginTop: 3 },
+  privacyTitle: { fontSize: 16, lineHeight: 22, fontWeight: '800' },
+  privacyText: { fontSize: 13, lineHeight: 18, marginTop: 3 },
   sectionTitle: { fontSize: 17, fontWeight: '900' },
   sectionSubtitle: { fontSize: 10, lineHeight: 15, marginTop: 2 },
   angleRow: { flexDirection: 'row', gap: 8, marginTop: 12 },

@@ -201,7 +201,8 @@ export default function AccountScreen() {
             'Nome, e-mail e senha (somente como hash, nunca em texto).',
             'Perfil nutricional: peso, altura, idade, objetivo e metas.',
             'Refeições, itens, água e horários que você registra.',
-            'Fotos enviadas para análise não são guardadas pelo servidor.',
+            'Fotos enviadas para análise de refeições não são guardadas pelo servidor.',
+            'Fotos de evolução só vão para a nuvem se você ativar "Guardar na nuvem".',
             'Aparelhos conectados, para você poder encerrar o acesso.',
           ].map(item => (
             <View key={item} style={styles.bullet}>

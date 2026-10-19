@@ -11,7 +11,7 @@ function deviceLabel(request) {
   return raw.replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, 120) || null;
 }
 
-function registerAccount(app, { pool, limits, onAccountDeleted = async () => {} }) {
+function registerAccount(app, { pool, limits, collectFiles = async () => [], removeFiles = async () => {} }) {
   const passwordLimiter = new FixedWindowLimiter(limits.accountPassword);
   const tooMany = 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
   const byUser = request => request.userId;
@@ -84,7 +84,7 @@ function registerAccount(app, { pool, limits, onAccountDeleted = async () => {} 
   app.get('/api/account/export', async (request, response, next) => {
     try {
       const userId = request.userId;
-      const [user, goals, meals, items, water, sessions] = await Promise.all([
+      const [user, goals, meals, items, water, sessions, photos] = await Promise.all([
         pool.query(`SELECT id, name, email, weight, age, height_cm, calculation_sex, activity_level, objective, motivation, mindset,
           avatar_text, streak, onboarding_completed, created_at, updated_at FROM users WHERE id = $1`, [userId]),
         pool.query('SELECT calories, protein, carbs, fat, water, updated_at FROM nutrition_goals WHERE user_id = $1', [userId]),
@@ -94,6 +94,7 @@ function registerAccount(app, { pool, limits, onAccountDeleted = async () => {} 
           FROM meal_items mi JOIN meals m ON m.id = mi.meal_id WHERE m.user_id = $1`, [userId]),
         pool.query('SELECT amount, consumed_at FROM water_entries WHERE user_id = $1 ORDER BY consumed_at', [userId]),
         pool.query('SELECT device_label, created_at, last_seen_at FROM auth_sessions WHERE user_id = $1', [userId]),
+        pool.query('SELECT id, angle, weight, taken_at FROM progress_photos WHERE user_id = $1 ORDER BY taken_at', [userId]),
       ]);
       const itemsByMeal = new Map();
       for (const item of items.rows) {
@@ -112,6 +113,7 @@ function registerAccount(app, { pool, limits, onAccountDeleted = async () => {} 
         meals: meals.rows.map(meal => ({ ...meal, items: itemsByMeal.get(meal.id) || [] })),
         waterEntries: water.rows,
         sessions: sessions.rows,
+        progressPhotos: photos.rows,
       });
     } catch (error) { next(error); }
   });
@@ -120,9 +122,11 @@ function registerAccount(app, { pool, limits, onAccountDeleted = async () => {} 
     try {
       if (request.body?.confirm !== 'EXCLUIR') return response.status(400).json({ error: 'Confirme digitando EXCLUIR.' });
       if (!(await checkPassword(request.userId, request.body?.password))) return response.status(400).json({ error: 'A senha está incorreta.' });
-      // As tabelas relacionadas usam ON DELETE CASCADE: refeições, água, metas, sessões e códigos somem junto.
+      // Os arquivos (fotos) precisam ser listados antes: as linhas somem por cascata junto com a conta.
+      const files = await collectFiles(request.userId);
+      // As tabelas relacionadas usam ON DELETE CASCADE: refeições, água, metas, sessões, códigos e fotos.
       await pool.query('DELETE FROM users WHERE id = $1', [request.userId]);
-      await onAccountDeleted(request.userId).catch(error => console.error('Limpeza pós-exclusão falhou:', error.message));
+      await removeFiles(files).catch(error => console.error('Arquivos da conta excluída não removidos:', error.message));
       response.status(204).end();
     } catch (error) { next(error); }
   });

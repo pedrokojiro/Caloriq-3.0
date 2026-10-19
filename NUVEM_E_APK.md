@@ -96,3 +96,13 @@ A partir da versão 1.4.0 (versionCode 6), o app consulta `GET /api/app/version`
 | `APP_RELEASE_NOTES` | `Recuperação de senha e relatórios em PDF.` | Opcional, até 500 caracteres |
 
 O aviso opcional pode ser adiado por 3 dias. Sem essas variáveis, nada aparece. Os APKs anteriores à 1.4.0 não têm o aviso: envie o primeiro link manualmente.
+
+## Fotos de evolução na nuvem
+
+Em **Evolução visual**, o usuário pode ativar **Guardar na nuvem**. A opção vem desligada por padrão, porque fotos do corpo são dados sensíveis. Ao ativar, as fotos do aparelho são enviadas para o Supabase Storage e passam a acompanhar a conta.
+
+1. No painel do Supabase, abra **Storage → New bucket**, crie `progress-photos` e deixe **Public bucket desligado**.
+2. Em **Project Settings → API**, copie a **Project URL** e a chave **service_role**.
+3. No Render, preencha `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY`. A service role ignora as regras de acesso do Supabase: nunca a coloque no app nem em variáveis `EXPO_PUBLIC_*`.
+
+As imagens só são entregues por URLs assinadas que expiram em 1 hora. Cada arquivo fica em `<id do usuário>/<id da foto>`. A API confere o conteúdo (JPG, PNG ou WebP, até 4 MB) e limita a 30 envios por hora. Excluir a foto ou a conta apaga também o arquivo do bucket. Sem as variáveis, a API responde `503` e o app continua guardando as fotos só no aparelho.

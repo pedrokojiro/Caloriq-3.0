@@ -86,6 +86,9 @@ export const caloriqApi = {
   getReport: (from: string, to: string, timeZone: string) => request<ReportData>(
     `/api/reports?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&tz=${encodeURIComponent(timeZone)}`,
   ),
+  listPhotos: () => request<{ photos: CloudPhoto[] }>('/api/photos'),
+  uploadPhoto: (data: { imageBase64: string; angle: CloudPhoto['angle']; weight?: number; takenAt?: string }) => request<{ photo: CloudPhoto }>('/api/photos', { method: 'POST', body: JSON.stringify(data) }),
+  deletePhoto: (id: string) => request<void>(`/api/photos/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   getSessions: () => request<{ sessions: AccountSession[] }>('/api/account/sessions'),
   endSession: (id: string) => request<void>(`/api/account/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   endOtherSessions: () => request<{ ended: number }>('/api/account/sessions/others', { method: 'DELETE' }),
@@ -95,6 +98,7 @@ export const caloriqApi = {
   addWater: (amount: number) => request<{ amount: number; total: number }>('/api/water', { method: 'POST', body: JSON.stringify({ amount, ...localDayBounds() }) }),
 };
 
+export interface CloudPhoto { id: string; url: string; angle: 'front' | 'side' | 'back'; weight?: number; createdAt: string }
 export interface AccountSession { id: string; device: string; createdAt: string; lastSeenAt: string; current: boolean }
 export interface AuthUser { id: string; name: string; email: string; onboardingCompleted: boolean }
 export interface AuthResponse { token: string; user: AuthUser }

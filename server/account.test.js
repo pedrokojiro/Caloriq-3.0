@@ -37,6 +37,7 @@ async function setup() {
     if (/^SELECT id, name, type/.test(text)) return rows(db.meals.filter(m => m.user_id === params[0]));
     if (/^SELECT mi.meal_id/.test(text)) { const ids = db.meals.filter(m => m.user_id === params[0]).map(m => m.id); return rows(db.items.filter(i => ids.includes(i.meal_id))); }
     if (/FROM water_entries/.test(text)) return rows(db.water.filter(w => w.user_id === params[0]));
+    if (/FROM progress_photos/.test(text)) return rows(params[0] === 'user-a' ? [{ id: 'p1', angle: 'front', weight: '62', taken_at: new Date() }] : []);
     if (/^SELECT device_label, created_at, last_seen_at FROM auth_sessions/.test(text)) return rows(db.sessions.filter(s => s.user_id === params[0]));
     if (/^DELETE FROM users WHERE id/.test(text)) {
       db.users = db.users.filter(u => u.id !== params[0]); db.sessions = db.sessions.filter(s => s.user_id !== params[0]); db.meals = db.meals.filter(m => m.user_id !== params[0]); return;
@@ -100,6 +101,7 @@ test('exportação traz só os dados da conta, sem hash de senha', async () => {
     assert.equal(JSON.stringify(result.body).includes('password_hash'), false);
     assert.deepEqual(result.body.meals.map(m => [m.id, m.items.length]), [['m1', 1]]);
     assert.equal(result.body.waterEntries.length, 1);
+    assert.deepEqual(result.body.progressPhotos.map(p => p.id), ['p1']);
   } finally { await server.close(); }
 });
 

@@ -95,6 +95,17 @@ CREATE TABLE IF NOT EXISTS password_reset_codes (
 );
 CREATE INDEX IF NOT EXISTS password_reset_user_idx ON password_reset_codes(user_id, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS progress_photos (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  storage_path TEXT NOT NULL UNIQUE,
+  angle VARCHAR(8) NOT NULL CHECK (angle IN ('front', 'side', 'back')),
+  weight NUMERIC(6,2),
+  taken_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS progress_photos_user_idx ON progress_photos(user_id, taken_at DESC);
+
 -- Remove os registros de demonstração criados pelas versões antigas.
 -- Contas e refeições reais usam UUIDs e não são afetadas.
 DELETE FROM users WHERE id = 'local-user';
