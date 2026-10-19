@@ -88,8 +88,8 @@ function createApp({ pool, generateContent = defaultGenerateContent, limits = {}
     } finally { client.release(); }
   });
 
-  const authIpLimiter = new FixedWindowLimiter(runtimeLimits.authIp);
-  const tooManyAuthRequests = `Muitas requisições. Tente novamente em ${Math.ceil(runtimeLimits.authIp.windowMs / 60000)} minuto(s).`;
+  const authIpLimiter = new FixedWindowLimiter(settings.authIp);
+  const tooManyAuthRequests = `Muitas requisições. Tente novamente em ${Math.ceil(settings.authIp.windowMs / 60000)} minuto(s).`;
 
   app.post('/api/auth/login',
     rateLimit(loginIpLimiter, request => request.ip, tooManyLogins),
