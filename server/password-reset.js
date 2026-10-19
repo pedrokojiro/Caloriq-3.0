@@ -88,7 +88,7 @@ function registerPasswordReset(app, { pool, sendEmail, issueSession, limits }) {
         await client.query('UPDATE password_reset_codes SET used_at = NOW() WHERE id = $1', [row.code_id]);
         // Encerra as sessões abertas em outros aparelhos e entra com uma sessão nova.
         await client.query('DELETE FROM auth_sessions WHERE user_id = $1', [row.id]);
-        const token = await issueSession(client, row.id);
+        const token = await issueSession(client, row.id, request);
         await client.query('COMMIT');
         response.json({ token, user: { id: row.id, name: row.name, email: row.email, onboardingCompleted: row.onboarding_completed } });
       } catch (error) {

@@ -65,6 +65,7 @@ export default function RootLayout() {
             <Stack.Screen name="sub-screens/edit-profile" />
             <Stack.Screen name="sub-screens/reminders" />
             <Stack.Screen name="sub-screens/devices" />
+            <Stack.Screen name="sub-screens/account" />
             <Stack.Screen name="sub-screens/notifications" />
           </Stack>
           </AuthenticatedState>

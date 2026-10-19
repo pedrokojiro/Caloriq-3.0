@@ -116,6 +116,14 @@ export default function ProfileScreen() {
             onPress={() => router.push('/sub-screens/reminders')}
           />
           <OptionItem
+            icon="shield-checkmark-outline"
+            iconColor={globalColors.primary}
+            iconBg={isDark ? '#1A3030' : '#EDFBF3'}
+            title="Privacidade e conta"
+            subtitle="Senha, aparelhos conectados, seus dados e exclusão"
+            onPress={() => router.push('/sub-screens/account')}
+          />
+          <OptionItem
             icon="watch-outline"
             iconColor={globalColors.fat}
             iconBg="#FFFBEB"

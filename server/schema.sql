@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS auth_sessions_user_idx ON auth_sessions(user_id);
+ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS device_label VARCHAR(120);
+ALTER TABLE auth_sessions ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS auth_sessions_expiry_idx ON auth_sessions(expires_at);
 
 CREATE TABLE IF NOT EXISTS nutrition_goals (

@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import * as Device from 'expo-device';
 import { readSettings } from './local-settings';
 import { readAuthToken } from './auth-storage';
 import type { AppState, Meal, NutritionGoals, UserProfile } from '../types';
@@ -36,11 +37,20 @@ export class ApiError extends Error {
   }
 }
 
+// Nome legível do aparelho, exibido em "Aparelhos conectados".
+const clientDevice = (() => {
+  const app = `CaloriQ ${Constants.expoConfig?.version ?? ''}`.trim();
+  if (Platform.OS === 'web') return `${app} · Navegador`;
+  const model = [Device.manufacturer, Device.modelName].filter(Boolean).join(' ');
+  const os = [Device.osName, Device.osVersion].filter(Boolean).join(' ');
+  return [model || 'Aparelho', os, app].filter(Boolean).join(' · ');
+})();
+
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const token = await readAuthToken();
   const response = await fetch(`${await getApiUrl()}${path}`, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init?.headers },
+    headers: { 'Content-Type': 'application/json', 'X-Client-Device': clientDevice, ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init?.headers },
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null) as ApiError['body'];
@@ -72,9 +82,16 @@ export const caloriqApi = {
   createMeal: (meal: Meal) => request('/api/meals', { method: 'POST', body: JSON.stringify(meal) }),
   updateMeal: (meal: Meal) => request(`/api/meals/${encodeURIComponent(meal.id)}`, { method: 'PUT', body: JSON.stringify(meal) }),
   deleteMeal: (mealId: string) => request(`/api/meals/${encodeURIComponent(mealId)}`, { method: 'DELETE' }),
+  getSessions: () => request<{ sessions: AccountSession[] }>('/api/account/sessions'),
+  endSession: (id: string) => request<void>(`/api/account/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  endOtherSessions: () => request<{ ended: number }>('/api/account/sessions/others', { method: 'DELETE' }),
+  changePassword: (currentPassword: string, newPassword: string) => request<{ endedSessions: number }>('/api/account/password', { method: 'PUT', body: JSON.stringify({ currentPassword, newPassword }) }),
+  exportAccountData: () => request<Record<string, unknown>>('/api/account/export'),
+  deleteAccount: (password: string) => request<void>('/api/account', { method: 'DELETE', body: JSON.stringify({ password, confirm: 'EXCLUIR' }) }),
   addWater: (amount: number) => request<{ amount: number; total: number }>('/api/water', { method: 'POST', body: JSON.stringify({ amount, ...localDayBounds() }) }),
 };
 
+export interface AccountSession { id: string; device: string; createdAt: string; lastSeenAt: string; current: boolean }
 export interface AuthUser { id: string; name: string; email: string; onboardingCompleted: boolean }
 export interface AuthResponse { token: string; user: AuthUser }
 export interface OnboardingResponse {

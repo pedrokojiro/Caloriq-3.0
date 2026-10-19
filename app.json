@@ -60,7 +60,8 @@
           "color": "#20C56B",
           "defaultChannel": "caloriq-reminders"
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

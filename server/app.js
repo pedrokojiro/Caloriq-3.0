@@ -8,6 +8,7 @@ const { FixedWindowLimiter, ConcurrencyLimiter, rateLimit } = require('./rate-li
 const { calculateNutritionTargets, validateProfile } = require('./nutrition');
 const { createMailer } = require('./mailer');
 const { registerPasswordReset } = require('./password-reset');
+const { registerAccount, deviceLabel } = require('./account');
 const { validateMeal, validateMealId, validateWaterChange, validateGoals, dayBounds, historyRange } = require('./validation');
 
 const DEFAULT_LIMITS = Object.freeze({
@@ -20,6 +21,7 @@ const DEFAULT_LIMITS = Object.freeze({
   forgotIp: { limit: 5, windowMs: 15 * 60 * 1000 },
   forgotEmail: { limit: 3, windowMs: 15 * 60 * 1000 },
   resetIp: { limit: 10, windowMs: 15 * 60 * 1000 },
+  accountPassword: { limit: 10, windowMs: 15 * 60 * 1000 },
 });
 
 // No Render a requisição passa por um único proxy, que informa o IP real em
@@ -58,10 +60,10 @@ function createApp({ pool, generateContent = defaultGenerateContent, sendEmail =
   app.use(cors());
   app.use(express.json({ limit: '12mb' }));
 
-  async function issueSession(client, userId) {
+  async function issueSession(client, userId, request) {
     const token = createSessionToken();
-    await client.query('INSERT INTO auth_sessions (token_hash, user_id, expires_at) VALUES ($1, $2, $3)',
-      [hashToken(token), userId, sessionExpiry()]);
+    await client.query('INSERT INTO auth_sessions (token_hash, user_id, expires_at, device_label) VALUES ($1, $2, $3, $4)',
+      [hashToken(token), userId, sessionExpiry(), request ? deviceLabel(request) : null]);
     return token;
   }
 
@@ -83,7 +85,7 @@ function createApp({ pool, generateContent = defaultGenerateContent, sendEmail =
         VALUES ($1,$2,$3,$4,70,$5,0,FALSE)`, [id, name, email, await hashPassword(password), avatarText]);
       await client.query(`INSERT INTO nutrition_goals (user_id, calories, protein, carbs, fat, water)
         VALUES ($1,2000,150,200,65,2500)`, [id]);
-      const token = await issueSession(client, id);
+      const token = await issueSession(client, id, request);
       await client.query('COMMIT');
       response.status(201).json({ token, user: { id, name, email, onboardingCompleted: false } });
     } catch (error) {
@@ -113,7 +115,7 @@ function createApp({ pool, generateContent = defaultGenerateContent, sendEmail =
       if (!user || !passwordMatches) {
         return response.status(401).json({ error: 'E-mail ou senha incorretos.' });
       }
-      const token = await issueSession(pool, user.id);
+      const token = await issueSession(pool, user.id, request);
       response.json({ token, user: { id: user.id, name: user.name, email: user.email, onboardingCompleted: user.onboarding_completed } });
     } catch (error) { next(error); }
   });
@@ -122,12 +124,19 @@ function createApp({ pool, generateContent = defaultGenerateContent, sendEmail =
     try {
       const [scheme, token] = String(request.headers.authorization || '').split(' ');
       if (scheme !== 'Bearer' || !token) return response.status(401).json({ error: 'Faça login para continuar.' });
-      const result = await pool.query(`SELECT s.user_id, u.name, u.email, u.onboarding_completed FROM auth_sessions s
-        JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > NOW()`, [hashToken(token)]);
+      const tokenHash = hashToken(token);
+      const result = await pool.query(`SELECT s.user_id, s.last_seen_at, u.name, u.email, u.onboarding_completed FROM auth_sessions s
+        JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > NOW()`, [tokenHash]);
       if (!result.rowCount) return response.status(401).json({ error: 'Sua sessão expirou. Entre novamente.' });
       request.userId = result.rows[0].user_id;
-      request.authTokenHash = hashToken(token);
+      request.authTokenHash = tokenHash;
       request.authUser = result.rows[0];
+      // Atualiza o "visto por último" no máximo a cada 10 minutos, sem atrasar a requisição.
+      const lastSeen = result.rows[0].last_seen_at ? new Date(result.rows[0].last_seen_at).getTime() : 0;
+      if (Date.now() - lastSeen > 10 * 60 * 1000) {
+        pool.query('UPDATE auth_sessions SET last_seen_at = NOW() WHERE token_hash = $1', [tokenHash])
+          .catch(error => console.warn('Não foi possível atualizar a sessão:', error.message));
+      }
       next();
     } catch (error) { next(error); }
   }
@@ -172,6 +181,8 @@ function createApp({ pool, generateContent = defaultGenerateContent, sendEmail =
   });
 
   app.use('/api', rateLimit(authIpLimiter, request => request.ip, tooManyAuthRequests), authenticate);
+
+  registerAccount(app, { pool, limits: settings });
 
   app.get('/api/auth/me', (request, response) => {
     response.json({ user: { id: request.userId, name: request.authUser.name, email: request.authUser.email,

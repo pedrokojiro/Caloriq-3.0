@@ -15,6 +15,7 @@ function fakePool(handler, users = {}) {
       const [, user] = entry;
       return { rows: [{ user_id: user.id, name: user.name || 'Teste', email: user.email || `${user.id}@teste.local`, onboarding_completed: true }], rowCount: 1 };
     }
+    if (/^UPDATE auth_sessions SET last_seen_at/.test(sql)) return { rows: [], rowCount: 1 };
     const result = await handler(sql, params, session);
     return result || { rows: [], rowCount: 0 };
   };
