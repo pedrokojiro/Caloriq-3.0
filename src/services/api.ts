@@ -7,6 +7,7 @@ import type { AppState, Meal, NutritionGoals, UserProfile } from '../types';
 import type { NutritionProfileInput } from '../utils/nutrition';
 import { localDayBounds } from '../utils/time';
 import { recentMealsSince, type ServerDailyTotals } from '../utils/history';
+import { toHeaderValue } from '../utils/header';
 import type { ReportData } from '../utils/report';
 
 const fallbackHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
@@ -41,10 +42,11 @@ export class ApiError extends Error {
 // Nome legível do aparelho, exibido em "Aparelhos conectados".
 const clientDevice = (() => {
   const app = `CaloriQ ${Constants.expoConfig?.version ?? ''}`.trim();
-  if (Platform.OS === 'web') return `${app} · Navegador`;
+  if (Platform.OS === 'web') return toHeaderValue(`${app} - Navegador`);
   const model = [Device.manufacturer, Device.modelName].filter(Boolean).join(' ');
-  const os = [Device.osName, Device.osVersion].filter(Boolean).join(' ');
-  return [model || 'Aparelho', os, app].filter(Boolean).join(' · ');
+  // Alguns Android devolvem a impressão digital do sistema em osName.
+  const os = `${Platform.OS === 'ios' ? 'iOS' : 'Android'} ${Device.osVersion ?? ''}`.trim();
+  return toHeaderValue([model || 'Aparelho', os, app].join(' - '));
 })();
 
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
