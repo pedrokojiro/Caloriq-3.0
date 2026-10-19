@@ -9,6 +9,7 @@ const { calculateNutritionTargets, validateProfile } = require('./nutrition');
 const { createMailer } = require('./mailer');
 const { registerPasswordReset } = require('./password-reset');
 const { registerAccount, deviceLabel } = require('./account');
+const { registerReports } = require('./reports');
 const { validateMeal, validateMealId, validateWaterChange, validateGoals, dayBounds, historyRange } = require('./validation');
 
 const DEFAULT_LIMITS = Object.freeze({
@@ -183,6 +184,7 @@ function createApp({ pool, generateContent = defaultGenerateContent, sendEmail =
   app.use('/api', rateLimit(authIpLimiter, request => request.ip, tooManyAuthRequests), authenticate);
 
   registerAccount(app, { pool, limits: settings });
+  registerReports(app, { pool });
 
   app.get('/api/auth/me', (request, response) => {
     response.json({ user: { id: request.userId, name: request.authUser.name, email: request.authUser.email,

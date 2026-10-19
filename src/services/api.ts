@@ -7,6 +7,7 @@ import type { AppState, Meal, NutritionGoals, UserProfile } from '../types';
 import type { NutritionProfileInput } from '../utils/nutrition';
 import { localDayBounds } from '../utils/time';
 import { recentMealsSince, type ServerDailyTotals } from '../utils/history';
+import type { ReportData } from '../utils/report';
 
 const fallbackHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
 const configuredUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
@@ -82,6 +83,9 @@ export const caloriqApi = {
   createMeal: (meal: Meal) => request('/api/meals', { method: 'POST', body: JSON.stringify(meal) }),
   updateMeal: (meal: Meal) => request(`/api/meals/${encodeURIComponent(meal.id)}`, { method: 'PUT', body: JSON.stringify(meal) }),
   deleteMeal: (mealId: string) => request(`/api/meals/${encodeURIComponent(mealId)}`, { method: 'DELETE' }),
+  getReport: (from: string, to: string, timeZone: string) => request<ReportData>(
+    `/api/reports?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&tz=${encodeURIComponent(timeZone)}`,
+  ),
   getSessions: () => request<{ sessions: AccountSession[] }>('/api/account/sessions'),
   endSession: (id: string) => request<void>(`/api/account/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   endOtherSessions: () => request<{ ended: number }>('/api/account/sessions/others', { method: 'DELETE' }),

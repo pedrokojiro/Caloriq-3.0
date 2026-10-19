@@ -5,6 +5,7 @@ import { BaseScreen, Card, ProgressBar, AnimatedNumber } from '../../src/compone
 import { useAppState } from '../../src/hooks/useAppState';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useDailyHistory } from '../../src/hooks/useDailyHistory';
+import { ReportExportCard } from '../../src/components/ReportExportCard';
 import { addDays, currentStreak, dateKey, startOfDay, zeroTotals, type DailyTotals, type Totals } from '../../src/utils/history';
 import { motion } from '../../src/theme/motion';
 import { triggerHaptic } from '../../src/utils/haptics';
@@ -280,6 +281,7 @@ export default function AnalyticsScreen() {
             );
           })}
         </View>
+        <ReportExportCard key={selectedPeriod} initialPeriod={selectedPeriod} userName={state.profile.name} />
         <View style={styles.bottomSpacer} />
         </RNAnimated.View>
       </ScrollView>
