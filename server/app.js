@@ -14,6 +14,7 @@ const DEFAULT_LIMITS = Object.freeze({
   loginIp: { limit: 20, windowMs: 15 * 60 * 1000 },
   loginEmail: { limit: 8, windowMs: 15 * 60 * 1000 },
   registerIp: { limit: 5, windowMs: 60 * 60 * 1000 },
+  authIp: { limit: 120, windowMs: 60 * 1000 },
 });
 
 // No Render a requisição passa por um único proxy, que informa o IP real em
@@ -86,6 +87,9 @@ function createApp({ pool, generateContent = defaultGenerateContent, limits = {}
       next(error);
     } finally { client.release(); }
   });
+
+  const authIpLimiter = new FixedWindowLimiter(runtimeLimits.authIp);
+  const tooManyAuthRequests = `Muitas requisições. Tente novamente em ${Math.ceil(runtimeLimits.authIp.windowMs / 60000)} minuto(s).`;
 
   app.post('/api/auth/login',
     rateLimit(loginIpLimiter, request => request.ip, tooManyLogins),
@@ -160,7 +164,7 @@ function createApp({ pool, generateContent = defaultGenerateContent, limits = {}
     } catch (error) { next(error); }
   });
 
-  app.use('/api', authenticate);
+  app.use('/api', rateLimit(authIpLimiter, request => request.ip, tooManyAuthRequests), authenticate);
 
   app.get('/api/auth/me', (request, response) => {
     response.json({ user: { id: request.userId, name: request.authUser.name, email: request.authUser.email,
