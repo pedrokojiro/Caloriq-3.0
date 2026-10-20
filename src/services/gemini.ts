@@ -74,7 +74,7 @@ export const testGeminiConnection = async () => {
 export interface ScannedMeal {
   name: string; emoji: string; calories: number; protein: number; carbs: number; fat: number;
   confidence: number; portions: number;
-  items: Array<{ name: string; amount: string; calories: number; protein: number; carbs: number; fat: number }>;
+  items: { name: string; amount: string; calories: number; protein: number; carbs: number; fat: number }[];
   insights: string;
 }
 
@@ -93,7 +93,7 @@ export const analyzeMealImage = async (imageUri: string, base64Data: string | nu
   }
 };
 
-export const chatWithGemini = async (userPrompt: string, history: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }>) => {
+export const chatWithGemini = async (userPrompt: string, history: { role: 'user' | 'model'; parts: { text: string }[] }[]) => {
   const data = await requestGemini({
     systemInstruction: { parts: [{ text: 'Você é o NutriCaloriQ IA. Responda somente em português brasileiro, em texto simples, sem Markdown, asteriscos ou títulos em inglês. Seja direto: no máximo 120 palavras, com frases completas. Para calorias, informe uma estimativa e a porção considerada; diferencie fatia de alimento inteiro e explique que tamanho e ingredientes alteram o valor. Não invente dados do diário do usuário. Não substitua aconselhamento médico.' }] },
     contents: [...history.slice(-8), { role: 'user', parts: [{ text: userPrompt }] }],

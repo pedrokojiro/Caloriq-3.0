@@ -16,3 +16,7 @@ services:
         sync: false
       - key: GEMINI_MODEL
         value: gemini-3.6-flash
+      - key: TRUST_PROXY
+        value: 1
+      - key: DISPLAY_TIME_ZONE
+        value: America/Sao_Paulo

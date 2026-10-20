@@ -65,7 +65,7 @@
     "db:setup": "node scripts/setup-local-db.js",
     "apresentar": "node scripts/present.js",
     "configurar": "node scripts/configure-local.js",
-    "test": "node --test server/*.test.js"
+    "test": "node --test server/*.test.js && node --experimental-strip-types --disable-warning=ExperimentalWarning --test tests/client/*.test.mjs"
   },
   "private": true
 }

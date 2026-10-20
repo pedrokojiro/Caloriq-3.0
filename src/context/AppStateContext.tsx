@@ -1,10 +1,15 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { AppState as NativeAppState } from 'react-native';
+import React, { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Alert, AppState as NativeAppState, Platform } from 'react-native';
 import { Meal, UserProfile, NutritionGoals, AppState } from '../types';
-import { caloriqApi } from '../services/api';
+import { ApiError, caloriqApi } from '../services/api';
 import type { ProfileUpdateInput } from '../services/api';
 import { subscribeSettings } from '../services/local-settings';
 import { useAuth } from './AuthContext';
+import { createId } from '../utils/id';
+import { formatMealTime } from '../utils/time';
+import {
+  SyncTracker, removeOptimisticMeal, restoreDeletedMeal, revertGoals, revertMealUpdate, revertWater,
+} from '../utils/optimistic';
 
 interface AppContextProps {
   state: AppState;
@@ -34,8 +39,15 @@ const initialGoals: NutritionGoals = {
 const AppStateContext = createContext<AppContextProps | undefined>(undefined);
 const localDayKey = (date = new Date()) => `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
 
+const reportFailure = (message: string) => {
+  const title = 'Não foi possível salvar';
+  if (Platform.OS === 'web' && typeof window !== 'undefined') window.alert(`${title}\n\n${message}`);
+  else Alert.alert(title, message);
+};
+
 export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [profile, setProfile] = useState<UserProfile>(initialProfile);
   const [goals, setGoals] = useState<NutritionGoals>(initialGoals);
   const [meals, setMeals] = useState<Meal[]>([]);
@@ -44,8 +56,30 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [activeDayKey, setActiveDayKey] = useState(() => localDayKey());
   const activeDayRef = useRef(activeDayKey);
   const [settingsVersion, setSettingsVersion] = useState(0);
+  const [reloadNonce, setReloadNonce] = useState(0);
+  const syncRef = useRef(new SyncTracker());
 
   useEffect(() => subscribeSettings(() => setSettingsVersion(value => value + 1)), []);
+
+  // Ao trocar de conta, descarta o estado anterior já na renderização e invalida
+  // as respostas pendentes antes do carregamento da nova conta.
+  const [stateOwner, setStateOwner] = useState(userId);
+  if (stateOwner !== userId) {
+    setStateOwner(userId);
+    setProfile(initialProfile);
+    setGoals(initialGoals);
+    setMeals([]);
+    setWaterIntake(0);
+  }
+  useLayoutEffect(() => {
+    syncRef.current.reset();
+    waterIntakeRef.current = 0;
+  }, [userId]);
+
+  const setWater = (next: number) => {
+    waterIntakeRef.current = next;
+    setWaterIntake(next);
+  };
 
   useEffect(() => {
     let midnightTimer: ReturnType<typeof setTimeout>;
@@ -77,61 +111,118 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     let active = true;
+    const sync = syncRef.current;
+    const ticket = sync.startFetch();
+    const dayKey = activeDayRef.current;
     caloriqApi.getState()
       .then(serverState => {
         if (!active) return;
+        const decision = sync.resolveFetch(ticket);
+        if (decision === 'reload') {
+          setReloadNonce(value => value + 1);
+          return;
+        }
+        if (decision !== 'apply' || dayKey !== activeDayRef.current) return;
         setProfile(serverState.profile);
         setGoals(serverState.goals);
         setMeals(serverState.meals);
-        waterIntakeRef.current = Math.max(0, serverState.waterIntake);
-        setWaterIntake(waterIntakeRef.current);
+        setWater(Math.max(0, serverState.waterIntake));
       })
       .catch(error => console.warn('Os dados da conta não puderam ser carregados.', error));
     return () => { active = false; };
-  }, [activeDayKey, settingsVersion, user]);
+  }, [activeDayKey, settingsVersion, userId, reloadNonce]);
+
+  // Executa uma gravação otimista. `revert` desfaz somente o efeito desta
+  // operação e só roda se a conta ainda for a mesma.
+  const persist = (save: () => Promise<unknown>, revert: (error: unknown) => void, failureMessage: string) => {
+    const sync = syncRef.current;
+    const epoch = sync.beginMutation();
+    save()
+      .then(() => undefined, error => {
+        if (!sync.isCurrent(epoch)) return;
+        console.warn(failureMessage, error);
+        revert(error);
+        reportFailure(error instanceof ApiError && error.status < 500 && error.body?.error ? error.body.error : failureMessage);
+      })
+      .finally(() => {
+        if (sync.settleMutation(epoch)) setReloadNonce(value => value + 1);
+      });
+  };
 
   const addMeal = (mealData: Omit<Meal, 'id' | 'time'>): Meal => {
     const now = new Date();
     const meal: Meal = {
       ...mealData,
-      id: `meal-${Date.now()}`,
-      time: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      id: createId(),
       consumedAt: now.toISOString(),
+      time: formatMealTime(now.toISOString()),
     };
     setMeals(current => [meal, ...current]);
-    void caloriqApi.createMeal(meal).catch(error => console.warn('Não foi possível salvar a refeição no PostgreSQL.', error));
+    persist(
+      () => caloriqApi.createMeal(meal),
+      () => setMeals(current => removeOptimisticMeal(current, meal)),
+      'Não foi possível salvar a refeição. Tente novamente.',
+    );
     return meal;
   };
 
   const updateMeal = (meal: Meal) => {
+    const previous = meals.find(item => item.id === meal.id);
     setMeals(current => current.map(item => item.id === meal.id ? meal : item));
-    void caloriqApi.updateMeal(meal).catch(error => console.warn('Não foi possível atualizar a refeição no PostgreSQL.', error));
+    persist(
+      () => caloriqApi.updateMeal(meal),
+      () => { if (previous) setMeals(current => revertMealUpdate(current, meal, previous)); },
+      'Não foi possível atualizar a refeição. Tente novamente.',
+    );
   };
 
   const deleteMeal = (mealId: string) => {
+    const index = meals.findIndex(meal => meal.id === mealId);
+    const removed = meals[index];
     setMeals(current => current.filter(meal => meal.id !== mealId));
-    void caloriqApi.deleteMeal(mealId).catch(error => console.warn('Não foi possível excluir a refeição no PostgreSQL.', error));
+    persist(
+      () => caloriqApi.deleteMeal(mealId),
+      () => { if (removed) setMeals(current => restoreDeletedMeal(current, removed, index)); },
+      'Não foi possível excluir a refeição. Tente novamente.',
+    );
   };
 
   const addWater = (amount: number) => {
     const next = Math.max(0, waterIntakeRef.current + amount);
     const appliedAmount = next - waterIntakeRef.current;
     if (appliedAmount === 0) return;
-    waterIntakeRef.current = next;
-    setWaterIntake(next);
-    void caloriqApi.addWater(appliedAmount).catch(error => console.warn('Não foi possível registrar a água no PostgreSQL.', error));
+    const dayKey = activeDayRef.current;
+    setWater(next);
+    persist(
+      () => caloriqApi.addWater(appliedAmount),
+      (error) => {
+        if (dayKey !== activeDayRef.current) return;
+        setWater(revertWater(waterIntakeRef.current, appliedAmount));
+        // O servidor recusou porque o total real é menor: recarrega o valor oficial.
+        if (error instanceof ApiError && error.body?.code === 'WATER_NEGATIVE') setReloadNonce(value => value + 1);
+      },
+      'Não foi possível registrar a água. Tente novamente.',
+    );
   };
 
   const updateGoals = (newGoals: Partial<NutritionGoals>) => {
-    setGoals(current => ({ ...current, ...newGoals }));
-    void caloriqApi.updateGoals(newGoals).catch(error => console.warn('Não foi possível atualizar as metas no PostgreSQL.', error));
+    const previous = goals;
+    const applied = { ...newGoals };
+    setGoals(current => ({ ...current, ...applied }));
+    persist(
+      () => caloriqApi.updateGoals(applied),
+      () => setGoals(current => revertGoals(current, previous, applied)),
+      'Não foi possível atualizar as metas. Tente novamente.',
+    );
   };
 
   const updateProfile = async (newProfile: ProfileUpdateInput) => {
+    const epoch = syncRef.current.epoch;
     try {
       const saved = await caloriqApi.updateProfile(newProfile);
+      if (!syncRef.current.isCurrent(epoch)) return;
       setProfile(saved.profile);
       if (saved.goals) setGoals(saved.goals);
     } catch (error) {

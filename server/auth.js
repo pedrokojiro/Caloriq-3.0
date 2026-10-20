@@ -1,4 +1,7 @@
-const { createHash, randomBytes, scryptSync, timingSafeEqual } = require('node:crypto');
+const { createHash, randomBytes, scrypt, timingSafeEqual } = require('node:crypto');
+const { promisify } = require('node:util');
+
+const scryptAsync = promisify(scrypt);
 
 const SESSION_DAYS = 30;
 
@@ -10,18 +13,22 @@ function validEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
 }
 
-function hashPassword(password) {
+// Hash no mesmo formato dos reais, usado quando o e-mail não existe para que o
+// tempo de resposta do login não revele quais contas estão cadastradas.
+const MISSING_USER_HASH = `${'0'.repeat(32)}:${'0'.repeat(128)}`;
+
+async function hashPassword(password) {
   const salt = randomBytes(16).toString('hex');
-  const hash = scryptSync(password, salt, 64).toString('hex');
+  const hash = (await scryptAsync(password, salt, 64)).toString('hex');
   return `${salt}:${hash}`;
 }
 
-function verifyPassword(password, stored) {
-  const [salt, expectedHex] = String(stored || '').split(':');
+async function verifyPassword(password, stored) {
+  const [salt, expectedHex] = String(stored || MISSING_USER_HASH).split(':');
   if (!salt || !expectedHex) return false;
   const expected = Buffer.from(expectedHex, 'hex');
-  const actual = scryptSync(password, salt, expected.length);
-  return expected.length === actual.length && timingSafeEqual(expected, actual);
+  const actual = await scryptAsync(password, salt, expected.length);
+  return expected.length === actual.length && timingSafeEqual(expected, actual) && Boolean(stored);
 }
 
 function createSessionToken() {

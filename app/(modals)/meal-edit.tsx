@@ -7,6 +7,7 @@ import { BaseScreen, Button, Card, Input } from '../../src/components';
 import { Ionicons } from '@expo/vector-icons';
 import { MealItem, MealType } from '../../src/types';
 import { triggerHaptic } from '../../src/utils/haptics';
+import { formatMealTime } from '../../src/utils/time';
 
 function editableMealData(
   existingMeal: ReturnType<typeof useAppState>['state']['meals'][number] | undefined,
@@ -152,8 +153,8 @@ export default function MealEditModal() {
       updateMeal({
         ...updatedMealData,
         id: mealId as string,
-        time: state.meals.find(m => m.id === mealId)?.time || '00:00',
-        consumedAt: state.meals.find(m => m.id === mealId)?.consumedAt,
+        time: formatMealTime(existingMeal?.consumedAt, existingMeal?.time || '00:00'),
+        consumedAt: existingMeal?.consumedAt,
       });
       Alert.alert('Sucesso', 'Refeição atualizada!');
     } else {

@@ -1,5 +1,5 @@
 type ResponseData = {
-  candidates?: Array<{ finishReason?: string; content?: { parts?: Array<{ text?: string; thought?: boolean }> } }>;
+  candidates?: { finishReason?: string; content?: { parts?: { text?: string; thought?: boolean }[] } }[];
 };
 
 export function readGeminiText(data: ResponseData, context: 'chat' | 'image' = 'chat'): string {
