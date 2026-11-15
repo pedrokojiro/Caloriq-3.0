@@ -51,13 +51,22 @@ const clientDevice = (() => {
 
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const token = await readAuthToken();
-  const response = await fetch(`${await getApiUrl()}${path}`, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', 'X-Client-Device': clientDevice, ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init?.headers },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${await getApiUrl()}${path}`, {
+      ...init,
+      headers: { 'Content-Type': 'application/json', 'X-Client-Device': clientDevice, ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init?.headers },
+    });
+  } catch {
+    // Sem resposta (sem internet ou servidor fora do ar): "Failed to fetch" não diz nada ao usuário.
+    throw new ApiError('Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.', 0, null);
+  }
   if (!response.ok) {
     const body = await response.json().catch(() => null) as ApiError['body'];
-    throw new ApiError(body?.error || `API local respondeu com status ${response.status}.`, response.status, body);
+    const fallback = response.status >= 500
+      ? 'O servidor está indisponível no momento. Tente novamente em alguns minutos.'
+      : `O servidor respondeu com status ${response.status}.`;
+    throw new ApiError(body?.error || fallback, response.status, body);
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;

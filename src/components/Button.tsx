@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { StyleSheet, Text, Pressable, ActivityIndicator, ViewStyle, TextStyle, View, StyleProp } from 'react-native';
-import Animated, { FadeIn, FadeOut, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useTheme } from '../hooks/useTheme';
 import { motion } from '../theme/motion';
 import { HapticFeedback, triggerHaptic } from '../utils/haptics';
@@ -101,37 +101,11 @@ export const Button: React.FC<ButtonProps> = ({
     }
   };
 
-  const renderContent = () => {
-    if (loading) {
-      return <Animated.View key="loading" entering={FadeIn.duration(motion.duration.fast)} exiting={FadeOut.duration(motion.duration.instant)}><ActivityIndicator color={getTextColor()} size="small" /></Animated.View>;
-    }
-
-    return (
-      <Animated.View key="content" entering={FadeIn.duration(motion.duration.fast)} exiting={FadeOut.duration(motion.duration.instant)} style={styles.content}>
-        {icon && <View style={styles.iconContainer}>{icon}</View>}
-        <Text style={[styles.text, { color: getTextColor() }, textStyle]}>
-          {title}
-        </Text>
-      </Animated.View>
-    );
-  };
-
-  if (variant === 'primary' && !disabled) {
-    return (
-      <AnimatedPressable
-        onPress={handlePress}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        disabled={disabled || loading}
-        style={[styles.container, animatedStyle, style]}
-      >
-        {/* Cor sólida de ação: o gradiente claro anterior deixava o texto branco em 2,2:1. */}
-        <View style={[styles.gradient, { backgroundColor: globalColors.action }]}>
-          {renderContent()}
-        </View>
-      </AnimatedPressable>
-    );
-  }
+  // Sem animação de entrada/saída (FadeIn/FadeOut) no conteúdo: no Android ela podia
+  // deixar o texto com opacidade 0 depois do carregamento, e o botão sumia. A árvore
+  // também é sempre a mesma, para não remontar quando o botão passa a ficar habilitado.
+  // Primário usa cor sólida de ação: o gradiente claro anterior deixava o texto branco em 2,2:1.
+  const solid = variant === 'primary' && !disabled;
 
   return (
     <AnimatedPressable
@@ -139,9 +113,19 @@ export const Button: React.FC<ButtonProps> = ({
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       disabled={disabled || loading}
-      style={[styles.container, getContainerStyles(), animatedStyle, style]}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
+      style={[styles.container, solid ? { backgroundColor: globalColors.action } : getContainerStyles(), animatedStyle, style]}
     >
-      {renderContent()}
+      {loading ? (
+        <ActivityIndicator color={getTextColor()} size="small" />
+      ) : (
+        <View style={styles.content}>
+          {icon ? <View style={styles.iconContainer}>{icon}</View> : null}
+          <Text style={[styles.text, { color: getTextColor() }, textStyle]}>{title}</Text>
+        </View>
+      )}
     </AnimatedPressable>
   );
 };
@@ -154,12 +138,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
     width: '100%',
-  },
-  gradient: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   content: {
     flexDirection: 'row',
