@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Animated as RNAnimated, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Reanimated, { FadeInUp, LinearTransition, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withSpring, withTiming } from 'react-native-reanimated';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Reanimated, { useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import { BaseScreen, Card, ProgressBar, AnimatedNumber } from '../../src/components';
 import { useAppState } from '../../src/hooks/useAppState';
 import { useTheme } from '../../src/hooks/useTheme';
@@ -8,6 +9,8 @@ import { useDailyHistory } from '../../src/hooks/useDailyHistory';
 import { ReportExportCard } from '../../src/components/ReportExportCard';
 import { addDays, currentStreak, dateKey, startOfDay, zeroTotals, type DailyTotals, type Totals } from '../../src/utils/history';
 import { motion } from '../../src/theme/motion';
+import { type } from '../../src/theme/type';
+import { layout } from '../../src/theme/layout';
 import { triggerHaptic } from '../../src/utils/haptics';
 
 type Period = 'week' | 'month' | 'threeMonths';
@@ -17,25 +20,7 @@ const DAY_MS = 86_400_000;
 const round = (value: number) => Math.round(value);
 const format = (value: number) => round(value).toLocaleString('pt-BR');
 
-function PeriodTab({ label, selected, onPress, activeColor, inactiveColor, backgroundColor }: { label: string; selected: boolean; onPress: () => void; activeColor: string; inactiveColor: string; backgroundColor: string }) {
-  const active = useSharedValue(selected ? 1 : 0);
-  const reduceMotion = useReducedMotion();
-  useEffect(() => {
-    active.value = reduceMotion ? (selected ? 1 : 0) : withSpring(selected ? 1 : 0, motion.spring.tab);
-  }, [active, reduceMotion, selected]);
-  const selectionStyle = useAnimatedStyle(() => ({
-    opacity: active.value,
-    transform: [{ scale: 0.9 + active.value * 0.1 }],
-  }));
-  return (
-    <Pressable onPress={() => { if (!selected) void triggerHaptic('selection'); onPress(); }} style={styles.pillTab}>
-      <Reanimated.View style={[styles.absoluteFill, styles.pillTabActive, { backgroundColor }, selectionStyle]} />
-      <Text style={[styles.pillTabText, { color: selected ? activeColor : inactiveColor }]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function AnimatedBar({ percentage, index, color, trackColor }: { percentage: number; index: number; color: string; trackColor: string }) {
+function AnimatedBar({ percentage, index, color, muted }: { percentage: number; index: number; color: string; muted?: boolean }) {
   const height = useSharedValue(0);
   const reduceMotion = useReducedMotion();
   useEffect(() => {
@@ -44,7 +29,7 @@ function AnimatedBar({ percentage, index, color, trackColor }: { percentage: num
       : withDelay(index * motion.stagger.short, withTiming(percentage, { duration: motion.duration.slow }));
   }, [height, index, percentage, reduceMotion]);
   const heightStyle = useAnimatedStyle(() => ({ height: `${height.value}%` }));
-  return <View style={[styles.barTrack, { backgroundColor: trackColor }]}><Reanimated.View style={[styles.barFill, { backgroundColor: color }, heightStyle]} /></View>;
+  return <View style={styles.barTrack}><Reanimated.View style={[styles.barFill, { backgroundColor: color, opacity: muted ? 0.4 : 1 }, heightStyle]} /></View>;
 }
 
 function isGoalReached(calories: number, target: number) {
@@ -124,239 +109,208 @@ function periodData(period: Period, dailyMap: Map<string, DailyTotals>, calorieG
   return { start, today, days, points, averages, reached, trend };
 }
 
+// "sáb., 14 de nov." vira "Sáb, 14 de nov": só a primeira letra em maiúscula.
+const dayLabel = (date: Date) => {
+  const text = date.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).replace(/./g, '');
+  return text.charAt(0).toUpperCase() + text.slice(1);
+};
+
+// Analytics no estilo "Diário limpo": a média do período em destaque, três números
+// de apoio, um gráfico de barras neutras (verde só onde a meta foi atingida) e listas.
 export default function AnalyticsScreen() {
   const { colors, globalColors } = useTheme();
+  const insets = useSafeAreaInsets();
   const { state } = useAppState();
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('week');
-  const [periodAnimation] = useState(() => new RNAnimated.Value(0));
-  const reduceMotion = useReducedMotion();
   const { dailyMap } = useDailyHistory(state.meals);
   const analytics = useMemo(() => periodData(selectedPeriod, dailyMap, state.goals.calories), [dailyMap, selectedPeriod, state.goals.calories]);
   const streak = useMemo(() => currentStreak(dailyMap, new Date()), [dailyMap]);
   const hasData = analytics.days.length > 0;
   const maxChartValue = Math.max(state.goals.calories, ...analytics.points.map(point => point.calories), 1);
-  const chartScale = maxChartValue * 1.15;
-  const targetLineTop = `${Math.max(0, 100 - ((state.goals.calories / chartScale) * 100))}%` as `${number}%`;
+  const chartScale = maxChartValue * 1.1;
+  const targetLineBottom = `${Math.min(100, (state.goals.calories / chartScale) * 100)}%` as `${number}%`;
   const periodLabel = selectedPeriod === 'week' ? 'últimos 7 dias' : selectedPeriod === 'month' ? 'mês atual' : 'últimos 3 meses';
   const chartTitle = selectedPeriod === 'week' ? 'Calorias por dia' : selectedPeriod === 'month' ? 'Média diária por semana' : 'Média diária por mês';
-  const recentDays = [...analytics.days].reverse().slice(0, 5);
-  const progress = (value: number, goal: number) => goal > 0 ? Math.min(value / goal, 1) : 0;
+  const recentDays = [...analytics.days].reverse().slice(0, 7);
 
-  useEffect(() => {
-    periodAnimation.setValue(reduceMotion ? 1 : 0);
-    RNAnimated.timing(periodAnimation, {
-      toValue: 1,
-      duration: reduceMotion ? 0 : motion.duration.slow,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [periodAnimation, reduceMotion, selectedPeriod, dailyMap.size]);
+  const trendText = analytics.trend === null
+    ? 'sem período anterior para comparar'
+    : analytics.trend === 0
+      ? 'igual ao período anterior'
+      : `${Math.abs(analytics.trend)}% ${analytics.trend > 0 ? 'acima' : 'abaixo'} do período anterior`;
 
-  const contentTranslateY = periodAnimation.interpolate({ inputRange: [0, 1], outputRange: [26, 0] });
-  const contentScale = periodAnimation.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] });
+  const stats = [
+    { label: 'Meta atingida', value: `${analytics.reached}/${analytics.days.length}`, detail: 'dias no alvo (±10%)' },
+    { label: 'Proteína média', value: `${format(analytics.averages.protein)} g`, detail: `meta ${format(state.goals.protein)} g` },
+    { label: 'Sequência', value: `${streak}`, detail: streak === 1 ? 'dia seguido' : 'dias seguidos' },
+  ];
 
   return (
     <BaseScreen edges={['top', 'left', 'right']}>
-      <View style={[styles.header, { backgroundColor: colors.bgCard, borderBottomColor: colors.borderColor }]}>
-        <Text style={[styles.headerTitle, { color: colors.textMain }]}>Analytics</Text>
-        <View style={[styles.pillTabs, { backgroundColor: colors.inputBg, borderColor: colors.borderColor }]}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.titleRow}>
+          <Text style={[type.title, { color: colors.textMain }]} accessibilityRole="header">Analytics</Text>
+        </View>
+
+        <View style={[styles.segmented, { backgroundColor: colors.track }]} accessibilityRole="tablist">
           {([
             ['week', '7 dias'],
             ['month', 'Mês'],
             ['threeMonths', '3 meses'],
-          ] as const).map(([value, label]) => (
-            <PeriodTab key={value} label={label} selected={selectedPeriod === value} onPress={() => setSelectedPeriod(value)} activeColor={colors.textMain} inactiveColor={colors.textLight} backgroundColor={colors.bgCard} />
-          ))}
-        </View>
-      </View>
-
-      <ScrollView style={styles.scroll} contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.bgApp }]} showsVerticalScrollIndicator={false}>
-        <RNAnimated.View style={{ opacity: periodAnimation, transform: [{ translateY: contentTranslateY }, { scale: contentScale }] }}>
-        <View style={styles.statsGrid}>
-          <Card style={styles.statCard}>
-            <View style={styles.statCardHeader}>
-              <Text style={[styles.statCardLabel, { color: colors.textLight }]}>Média diária</Text>
-              {analytics.trend !== null ? (
-                <View style={[styles.trendBadge, { backgroundColor: analytics.trend >= 0 ? '#EDFBF3' : '#FEF2F2' }]}>
-                  <Text style={[styles.trendText, { color: analytics.trend >= 0 ? globalColors.primary : globalColors.danger }]}>{analytics.trend >= 0 ? '↑' : '↓'} {Math.abs(analytics.trend)}%</Text>
-                </View>
-              ) : null}
-            </View>
-            <AnimatedNumber value={analytics.averages.calories} style={[styles.statCardValue, { color: colors.textMain }]} />
-            <Text style={[styles.statCardSub, { color: colors.textLight }]}>kcal / dia registrado</Text>
-          </Card>
-
-          <Card style={styles.statCard}>
-            <View style={styles.statCardHeader}>
-              <Text style={[styles.statCardLabel, { color: colors.textLight }]}>Meta atingida</Text>
-              <View style={[styles.trendBadge, { backgroundColor: '#EEF4FF' }]}>
-                <Text style={[styles.trendText, { color: globalColors.water }]}>{analytics.days.length ? Math.round((analytics.reached / analytics.days.length) * 100) : 0}%</Text>
-              </View>
-            </View>
-            <Text style={[styles.statCardValue, { color: colors.textMain }]}>{analytics.reached}/{analytics.days.length}</Text>
-            <View style={styles.squaresRow}>
-              {analytics.points.map((point, index) => <View key={`${point.label}-${index}`} style={[styles.squareDot, { backgroundColor: point.goalReached ? globalColors.primary : colors.inputBorder }]} />)}
-            </View>
-          </Card>
-
-          <Card style={styles.statCard}>
-            <Text style={[styles.statCardLabel, { color: colors.textLight, marginBottom: 8 }]}>Proteína méd.</Text>
-            <AnimatedNumber value={analytics.averages.protein} suffix="g" style={[styles.statCardValue, { color: globalColors.protein }]} />
-            <Text style={[styles.statCardSub, { color: colors.textLight }]}>meta: {format(state.goals.protein)}g</Text>
-            <ProgressBar progress={progress(analytics.averages.protein, state.goals.protein)} color={globalColors.protein} style={{ marginTop: 8 }} />
-          </Card>
-
-          <Card style={styles.statCard}>
-            <Text style={[styles.statCardLabel, { color: colors.textLight, marginBottom: 8 }]}>Streak atual</Text>
-            <View style={styles.inlineMetric}><AnimatedNumber value={streak} style={[styles.statCardValue, { color: colors.textMain }]} /><Text style={[styles.statCardValue, { color: colors.textMain }]}> 🔥</Text></View>
-            <Text style={[styles.statCardSub, { color: colors.textLight }]}>dias registrados</Text>
-          </Card>
-        </View>
-
-        <Card style={[styles.chartCard, { borderColor: colors.borderColor }]}>
-          <View style={styles.chartCardHeaderRow}>
-            <View>
-              <Text style={[styles.chartCardTitle, { color: colors.textMain }]}>{chartTitle}</Text>
-              <Text style={[styles.chartSubtitle, { color: colors.textLight }]}>{periodLabel}</Text>
-            </View>
-            <View style={[styles.chip, { backgroundColor: colors.inputBg }]}><Text style={[styles.chipText, { color: colors.textMuted }]}>Meta: {format(state.goals.calories)}</Text></View>
-          </View>
-
-          <View style={styles.chartContainer}>
-            {state.goals.calories > 0 ? (
-              <View style={[styles.chartTargetLine, { borderColor: `${globalColors.primary}55`, top: targetLineTop }]}>
-                <Text style={[styles.chartTargetLineText, { color: globalColors.primary, backgroundColor: colors.bgCard }]}>meta</Text>
-              </View>
-            ) : null}
-            <View style={styles.barsRow}>
-              {analytics.points.map((point, index) => {
-                const heightPercentage = point.calories > 0 ? Math.max(4, Math.min(100, (point.calories / chartScale) * 100)) : 0;
-                return (
-                  <View key={`bar-${index}`} style={styles.barCol}>
-                    <AnimatedBar percentage={heightPercentage} index={index} trackColor={colors.inputBorder} color={point.goalReached ? globalColors.primary : point.calories > 0 ? globalColors.water : 'transparent'} />
-                    <Text style={[styles.barLabel, { color: colors.textLight }]}>{point.label}</Text>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-          <Text style={[styles.chartInsightText, { color: colors.textMuted }]}>
-            {!hasData ? 'Registre sua primeira refeição para começar o histórico.' : analytics.reached > 0 ? `Meta atingida em ${analytics.reached} dia(s) neste período.` : 'Seus registros aparecerão aqui conforme você se aproxima da meta.'}
-          </Text>
-        </Card>
-
-        <Card style={[styles.macrosCard, { borderColor: colors.borderColor }]}>
-          <Text style={[styles.macrosTitle, { color: colors.textMain }]}>Distribuição de macros</Text>
-          <Text style={[styles.macrosSubtitle, { color: colors.textLight }]}>Média dos dias registrados · {periodLabel}</Text>
-          <MacroProgress name="Proteína" value={analytics.averages.protein} goal={state.goals.protein} color={globalColors.protein} textColor={colors.textMain} />
-          <MacroProgress name="Carboidrato" value={analytics.averages.carbs} goal={state.goals.carbs} color={globalColors.carbs} textColor={colors.textMain} />
-          <MacroProgress name="Gordura" value={analytics.averages.fat} goal={state.goals.fat} color={globalColors.fat} textColor={colors.textMain} />
-        </Card>
-
-        <View style={styles.historySection}>
-          <Text style={[styles.historySectionTitle, { color: colors.textMain }]}>Histórico do período</Text>
-          {!recentDays.length ? (
-            <Card style={[styles.emptyCard, { borderColor: colors.borderColor }]}>
-              <Text style={styles.emptyEmoji}>📊</Text>
-              <Text style={[styles.emptyTitle, { color: colors.textMain }]}>Tudo começa do zero</Text>
-              <Text style={[styles.emptyDescription, { color: colors.textLight }]}>Nenhum dado artificial foi incluído. Suas refeições reais formarão este relatório.</Text>
-            </Card>
-          ) : recentDays.map((day, index) => {
-            const reached = isGoalReached(day.calories, state.goals.calories);
+          ] as const).map(([value, label]) => {
+            const selected = selectedPeriod === value;
             return (
-              <Reanimated.View key={day.key} entering={FadeInUp.delay(index * motion.stagger.short).duration(motion.duration.normal)} layout={LinearTransition.duration(motion.duration.normal)}>
-              <Card style={[styles.historyItem, { borderColor: colors.borderColor }]}>
-                <View style={styles.historyRow}>
-                  <View style={styles.historyCopy}>
-                    <Text style={[styles.historyDay, { color: colors.textMain }]}>{day.date.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}</Text>
-                    <Text style={[styles.historyMacros, { color: colors.textLight }]}>P: {round(day.protein)}g · C: {round(day.carbs)}g · G: {round(day.fat)}g · {day.meals} refeição(ões)</Text>
-                  </View>
-                  <View style={styles.historyCalories}>
-                    <Text style={[styles.historyKcal, { color: reached ? globalColors.primary : colors.textMain }]}>{format(day.calories)} kcal</Text>
-                    <Text style={[styles.historyStatus, { color: reached ? globalColors.primary : colors.textLight }]}>{reached ? 'Meta atingida ✓' : 'Registrado'}</Text>
-                  </View>
-                </View>
-              </Card>
-              </Reanimated.View>
+              <Pressable
+                key={value}
+                onPress={() => { if (!selected) void triggerHaptic('selection'); setSelectedPeriod(value); }}
+                style={[styles.segment, selected && { backgroundColor: colors.bgCard }]}
+                accessibilityRole="tab"
+                accessibilityState={{ selected }}
+              >
+                <Text style={[type.caption, selected && type.strong, { color: selected ? colors.textMain : colors.textMuted }]}>{label}</Text>
+              </Pressable>
             );
           })}
         </View>
+
+        <View style={styles.hero}>
+          <Text style={[type.caption, { color: colors.textMuted }]}>Média diária · {periodLabel}</Text>
+          <View style={styles.heroValue}>
+            <AnimatedNumber value={analytics.averages.calories} style={[type.display, { color: colors.textMain }]} />
+            <Text style={[type.body, { color: colors.textMuted }]}>kcal</Text>
+          </View>
+          <Text style={[type.caption, { color: colors.textMuted }]}>{hasData ? trendText : 'Ainda sem registros neste período'}</Text>
+        </View>
+
+        <Card style={styles.statsRow}>
+          {stats.map((stat, index) => (
+            <View key={stat.label} style={[styles.statCol, index > 0 && { borderLeftColor: colors.hairline, borderLeftWidth: StyleSheet.hairlineWidth * 2 }]}>
+              <Text style={[type.caption, { color: colors.textMuted }]} numberOfLines={1}>{stat.label}</Text>
+              <Text style={[type.title, type.number, { color: colors.textMain }]} numberOfLines={1}>{stat.value}</Text>
+              <Text style={[type.caption, { color: colors.textLight }]} numberOfLines={2}>{stat.detail}</Text>
+            </View>
+          ))}
+        </Card>
+
+        <Card style={styles.chartCard}>
+          <View style={styles.rowBetween}>
+            <Text style={[type.body, type.strong, { color: colors.textMain }]}>{chartTitle}</Text>
+            <Text style={[type.caption, type.number, { color: colors.textMuted }]}>meta {format(state.goals.calories)}</Text>
+          </View>
+          <View style={styles.chartArea}>
+            {state.goals.calories > 0 ? (
+              <View pointerEvents="none" style={[styles.targetLine, { bottom: targetLineBottom, borderColor: colors.textLight }]} />
+            ) : null}
+            {analytics.points.map((point, index) => {
+              const heightPercentage = point.calories > 0 ? Math.max(4, Math.min(100, (point.calories / chartScale) * 100)) : 0;
+              return (
+                <View key={`bar-${index}`} style={styles.barCol}>
+                  <AnimatedBar
+                    percentage={heightPercentage}
+                    index={index}
+                    color={point.goalReached ? globalColors.action : colors.textLight}
+                    muted={!point.goalReached}
+                  />
+                </View>
+              );
+            })}
+          </View>
+          <View style={styles.labelsRow}>
+            {analytics.points.map((point, index) => (
+              <Text key={`label-${index}`} style={[type.caption, styles.barLabel, { color: colors.textMuted }]} numberOfLines={1}>{point.label}</Text>
+            ))}
+          </View>
+          <View style={styles.legend}>
+            <View style={[styles.legendDot, { backgroundColor: globalColors.action }]} />
+            <Text style={[type.caption, { color: colors.textMuted }]}>no alvo</Text>
+            <View style={[styles.legendDot, { backgroundColor: colors.textLight, opacity: 0.4 }]} />
+            <Text style={[type.caption, { color: colors.textMuted }]}>fora do alvo</Text>
+            <View style={[styles.legendLine, { borderColor: colors.textLight }]} />
+            <Text style={[type.caption, { color: colors.textMuted }]}>meta</Text>
+          </View>
+        </Card>
+
+        <Text style={[type.overline, styles.sectionLabel, { color: colors.textMuted }]} accessibilityRole="header">Macros · média do período</Text>
+        <Card style={styles.list}>
+          {([
+            ['Proteína', analytics.averages.protein, state.goals.protein, globalColors.protein],
+            ['Carboidrato', analytics.averages.carbs, state.goals.carbs, globalColors.carbs],
+            ['Gordura', analytics.averages.fat, state.goals.fat, globalColors.fat],
+          ] as const).map(([name, value, goal, color], index) => (
+            <View key={name} style={[styles.macroRow, index > 0 && { borderTopColor: colors.hairline, borderTopWidth: StyleSheet.hairlineWidth * 2 }]}>
+              <View style={styles.rowBetween}>
+                <Text style={[type.body, { color: colors.textMain }]}>{name}</Text>
+                <Text style={[type.body, type.number, { color: colors.textMain }]}>
+                  {format(value)}<Text style={[type.caption, { color: colors.textMuted }]}> / {format(goal)} g</Text>
+                </Text>
+              </View>
+              <ProgressBar progress={goal > 0 ? Math.min(value / goal, 1) : 0} color={color} trackColor={colors.track} height={4} />
+            </View>
+          ))}
+        </Card>
+
+        <Text style={[type.overline, styles.sectionLabel, { color: colors.textMuted }]} accessibilityRole="header">Dias registrados</Text>
+        {!recentDays.length ? (
+          <Card style={styles.emptyCard}>
+            <Text style={[type.body, type.strong, { color: colors.textMain }]}>Nada neste período</Text>
+            <Text style={[type.caption, { color: colors.textMuted }]}>Os dias aparecem aqui conforme você registra refeições.</Text>
+          </Card>
+        ) : (
+          <Card style={styles.list}>
+            {recentDays.map((day, index) => {
+              const reached = isGoalReached(day.calories, state.goals.calories);
+              return (
+                <View key={day.key} style={[styles.dayRow, index > 0 && { borderTopColor: colors.hairline, borderTopWidth: StyleSheet.hairlineWidth * 2 }]}>
+                  <View style={styles.flex}>
+                    <Text style={[type.body, { color: colors.textMain }]}>{dayLabel(day.date)}</Text>
+                    <Text style={[type.caption, type.number, { color: colors.textMuted }]}>
+                      P {round(day.protein)} · C {round(day.carbs)} · G {round(day.fat)} · {day.meals} {day.meals === 1 ? 'refeição' : 'refeições'}
+                    </Text>
+                  </View>
+                  <View style={styles.dayKcal}>
+                    <Text style={[type.body, type.strong, type.number, { color: colors.textMain }]}>{format(day.calories)}</Text>
+                    {reached ? <Text style={[type.caption, { color: colors.brandText }]}>no alvo</Text> : null}
+                  </View>
+                </View>
+              );
+            })}
+          </Card>
+        )}
+
         <ReportExportCard key={selectedPeriod} initialPeriod={selectedPeriod} userName={state.profile.name} />
-        <View style={styles.bottomSpacer} />
-        </RNAnimated.View>
+        <View style={{ height: layout.tabBarHeight + Math.max(insets.bottom, 8) + 24 }} />
       </ScrollView>
     </BaseScreen>
   );
 }
 
-function MacroProgress({ name, value, goal, color, textColor }: { name: string; value: number; goal: number; color: string; textColor: string }) {
-  return (
-    <View style={styles.macroProgressItem}>
-      <View style={styles.macroProgressHeader}>
-        <Text style={[styles.macroProgressName, { color: textColor }]}>{name}</Text>
-        <Text style={[styles.macroProgressValue, { color }]}>{format(value)}g / {format(goal)}g</Text>
-      </View>
-      <ProgressBar progress={goal > 0 ? Math.min(value / goal, 1) : 0} color={color} />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  absoluteFill: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+  flex: { flex: 1, minWidth: 0 },
   scroll: { flex: 1 },
-  scrollContent: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 16 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, ...Platform.select({ ios: { paddingTop: 48 } }) },
-  headerTitle: { fontSize: 24, fontWeight: '900', letterSpacing: -0.6 },
-  pillTabs: { flexDirection: 'row', borderRadius: 12, borderWidth: 1, padding: 3 },
-  pillTab: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8 },
-  pillTabActive: { borderRadius: 8, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 }, android: { elevation: 2 } }) },
-  pillTabText: { fontSize: 12, fontWeight: '700' },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
-  statCard: { width: '48.5%', padding: 16 },
-  statCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
-  statCardLabel: { fontSize: 12, fontWeight: '600' },
-  trendBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 100 },
-  trendText: { fontSize: 10, fontWeight: '700' },
-  statCardValue: { fontSize: 28, fontWeight: '900', letterSpacing: -0.8 },
-  inlineMetric: { flexDirection: 'row', alignItems: 'baseline' },
-  statCardSub: { fontSize: 11 },
-  squaresRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, marginTop: 8 },
-  squareDot: { width: 14, height: 14, borderRadius: 4 },
-  chartCard: { padding: 18, marginBottom: 14 },
-  chartCardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 },
-  chartCardTitle: { fontSize: 16, fontWeight: '800', letterSpacing: -0.4 },
-  chartSubtitle: { fontSize: 11, marginTop: 2 },
-  chip: { borderRadius: 100, paddingHorizontal: 10, paddingVertical: 4 },
-  chipText: { fontSize: 12, fontWeight: '600' },
-  chartContainer: { height: 165, justifyContent: 'flex-end', position: 'relative', marginBottom: 16 },
-  chartTargetLine: { position: 'absolute', left: 0, right: 0, borderTopWidth: 1.5, borderStyle: 'dashed', alignItems: 'flex-end', zIndex: 1 },
-  chartTargetLineText: { fontSize: 10, fontWeight: '700', paddingHorizontal: 4, marginTop: -8 },
-  barsRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around', height: 135, paddingHorizontal: 8 },
-  barCol: { alignItems: 'center', flex: 1, maxWidth: 44 },
-  barTrack: { height: 112, width: 12, borderRadius: 6, justifyContent: 'flex-end', overflow: 'hidden' },
-  barFill: { width: '100%', borderRadius: 6 },
-  barLabel: { fontSize: 10, fontWeight: '600', marginTop: 7, textTransform: 'capitalize' },
-  chartInsightText: { fontSize: 13, lineHeight: 18, textAlign: 'center' },
-  macrosCard: { padding: 18, marginBottom: 14 },
-  macrosTitle: { fontSize: 16, fontWeight: '800', letterSpacing: -0.4 },
-  macrosSubtitle: { fontSize: 12, marginBottom: 14 },
-  macroProgressItem: { marginBottom: 14 },
-  macroProgressHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  macroProgressName: { fontSize: 13, fontWeight: '600' },
-  macroProgressValue: { fontSize: 13, fontWeight: '700' },
-  historySection: { marginVertical: 12 },
-  historySectionTitle: { fontSize: 17, fontWeight: '800', letterSpacing: -0.4, marginBottom: 12 },
-  historyItem: { padding: 16, marginBottom: 10 },
-  historyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
-  historyCopy: { flex: 1 },
-  historyDay: { fontSize: 14, fontWeight: '700', textTransform: 'capitalize' },
-  historyMacros: { fontSize: 11, marginTop: 4 },
-  historyCalories: { alignItems: 'flex-end' },
-  historyKcal: { fontSize: 14, fontWeight: '800' },
-  historyStatus: { fontSize: 10, fontWeight: '600', marginTop: 2 },
-  emptyCard: { padding: 24, alignItems: 'center' },
-  emptyEmoji: { fontSize: 28, marginBottom: 9 },
-  emptyTitle: { fontSize: 16, fontWeight: '800', marginBottom: 5 },
-  emptyDescription: { fontSize: 12, lineHeight: 18, textAlign: 'center' },
-  bottomSpacer: { height: 100 },
+  content: { flexGrow: 1, paddingHorizontal: 16, paddingTop: 4, gap: 16 },
+  titleRow: { minHeight: 48, justifyContent: 'center' },
+  segmented: { flexDirection: 'row', borderRadius: 12, padding: 4 },
+  segment: { flex: 1, minHeight: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  hero: { gap: 4, paddingTop: 8 },
+  heroValue: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  statsRow: { flexDirection: 'row', paddingVertical: 16 },
+  statCol: { flex: 1, minWidth: 0, paddingHorizontal: 12, gap: 2 },
+  chartCard: { padding: 16, gap: 12 },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 },
+  chartArea: { height: 140, flexDirection: 'row', alignItems: 'flex-end', position: 'relative' },
+  targetLine: { position: 'absolute', left: 0, right: 0, borderTopWidth: 1, borderStyle: 'dashed', opacity: 0.6 },
+  barCol: { flex: 1, alignItems: 'center', height: '100%', justifyContent: 'flex-end' },
+  barTrack: { height: '100%', width: 16, justifyContent: 'flex-end' },
+  barFill: { width: '100%', borderRadius: 4 },
+  labelsRow: { flexDirection: 'row', marginTop: -4 },
+  barLabel: { flex: 1, textAlign: 'center', textTransform: 'capitalize' },
+  legend: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+  legendDot: { width: 8, height: 8, borderRadius: 2 },
+  legendLine: { width: 12, borderTopWidth: 1, borderStyle: 'dashed' },
+  sectionLabel: { marginTop: 8, marginBottom: -8 },
+  list: { paddingHorizontal: 16 },
+  macroRow: { paddingVertical: 12, gap: 8 },
+  dayRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, minHeight: 64 },
+  dayKcal: { alignItems: 'flex-end' },
+  emptyCard: { padding: 16, gap: 4 },
 });

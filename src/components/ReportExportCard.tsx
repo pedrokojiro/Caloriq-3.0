@@ -13,8 +13,8 @@ import { buildReportCsv, buildReportHtml, PERIOD_LABELS, reportFileName, reportR
 type Format = 'pdf' | 'csv';
 
 export function ReportExportCard({ initialPeriod, userName }: { initialPeriod: ReportPeriod; userName: string }) {
-  const { colors, isDark } = useTheme();
-  const brandText = isDark ? '#3DD68C' : '#0E7A3E';
+  const { colors } = useTheme();
+  const brandText = colors.brandText;
   const [period, setPeriod] = useState<ReportPeriod>(initialPeriod);
   const [format, setFormat] = useState<Format>('pdf');
   const [loading, setLoading] = useState(false);
@@ -53,7 +53,7 @@ export function ReportExportCard({ initialPeriod, userName }: { initialPeriod: R
     <Pressable
       key={key}
       onPress={onPress}
-      style={[styles.chip, { borderColor: selected ? brandText : colors.inputBorder, backgroundColor: selected ? (isDark ? '#1A3030' : '#E8F7EF') : 'transparent' }]}
+      style={[styles.chip, { borderColor: selected ? brandText : colors.inputBorder, backgroundColor: selected ? colors.aiTint : 'transparent' }]}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
     >
@@ -64,7 +64,7 @@ export function ReportExportCard({ initialPeriod, userName }: { initialPeriod: R
   return (
     <Card style={styles.card}>
       <View style={styles.titleRow}>
-        <Ionicons name="document-text-outline" size={22} color={brandText} />
+        <Ionicons name="document-text-outline" size={22} color={colors.textMuted} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.title, { color: colors.textMain }]}>Exportar relatório</Text>
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>Leve seus registros para um nutricionista ou guarde uma cópia.</Text>
@@ -80,19 +80,19 @@ export function ReportExportCard({ initialPeriod, userName }: { initialPeriod: R
         {chip(format === 'csv', 'CSV · planilha', () => setFormat('csv'), 'csv')}
       </View>
       <Button title="Gerar relatório" onPress={generate} loading={loading} style={{ marginTop: 14 }} />
-      {status ? <Text style={[styles.status, { color: status.ok ? brandText : (isDark ? '#FF8A7A' : '#C4320A') }]} accessibilityLiveRegion="polite">{status.text}</Text> : null}
+      {status ? <Text style={[styles.status, { color: status.ok ? brandText : colors.dangerText }]} accessibilityLiveRegion="polite">{status.text}</Text> : null}
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { padding: 16, marginTop: 16 },
+  card: { padding: 16 },
   titleRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-  title: { fontSize: 16, lineHeight: 22, fontWeight: '800' },
-  subtitle: { fontSize: 14, lineHeight: 20 },
-  label: { fontSize: 12, lineHeight: 16, fontWeight: '700', marginTop: 14, marginBottom: 8 },
+  title: { fontSize: 16, lineHeight: 22, fontWeight: '600' },
+  subtitle: { fontSize: 13, lineHeight: 18 },
+  label: { fontSize: 13, lineHeight: 18, fontWeight: '600', marginTop: 16, marginBottom: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { minHeight: 40, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1.5, justifyContent: 'center' },
-  chipText: { fontSize: 14, fontWeight: '700' },
-  status: { fontSize: 14, lineHeight: 20, marginTop: 10 },
+  chip: { minHeight: 40, paddingHorizontal: 12, borderRadius: 20, borderWidth: 1, justifyContent: 'center' },
+  chipText: { fontSize: 13, fontWeight: '600' },
+  status: { fontSize: 13, lineHeight: 18, marginTop: 12 },
 });
