@@ -31,20 +31,22 @@ export const Card: React.FC<CardProps> = ({
     }],
   }));
 
+  // Superfície plana com contorno quase invisível: a hierarquia vem do conteúdo,
+  // não de bordas e sombras em todo bloco.
   const cardStyle: ViewStyle = {
     backgroundColor: colors.bgCard,
-    borderColor: colors.borderColor,
-    borderWidth: elevated ? 0 : 1,
-    borderRadius: 20,
+    borderColor: colors.hairline,
+    borderWidth: elevated ? 0 : StyleSheet.hairlineWidth * 2,
+    borderRadius: 16,
   };
 
   const shadowStyle: ViewStyle = elevated
     ? {
         shadowColor: colors.shadowColor,
-        shadowOffset: { width: 0, height: 4 },
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: colors.shadowOpacity,
-        shadowRadius: 12,
-        elevation: 5,
+        shadowRadius: 24,
+        elevation: 3,
       }
     : {};
 

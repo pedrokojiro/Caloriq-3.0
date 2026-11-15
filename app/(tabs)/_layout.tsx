@@ -1,72 +1,50 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Redirect, Tabs } from 'expo-router';
-import { ActivityIndicator, StyleSheet, Text, View, Pressable, Platform } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { layout } from '../../src/theme/layout';
 import { useAuth } from '../../src/context/AuthContext';
-import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
 import { motion } from '../../src/theme/motion';
 import { triggerHaptic } from '../../src/utils/haptics';
 
 type TabVisual = { icon: string; label: string; isScanner: boolean };
 
 function TabItem({ item, focused, onPress, primary, muted }: { item: TabVisual; focused: boolean; onPress: () => void; primary: string; muted: string }) {
-  const active = useSharedValue(focused ? 1 : 0);
-  const reduceMotion = useReducedMotion();
-  useEffect(() => {
-    active.value = reduceMotion ? (focused ? 1 : 0) : withSpring(focused ? 1 : 0, motion.spring.tab);
-  }, [active, focused, reduceMotion]);
-  const iconMotion = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: reduceMotion ? 0 : -3 * active.value },
-      { scale: reduceMotion ? 1 : 1 + 0.08 * active.value },
-    ],
-  }));
-  const indicatorMotion = useAnimatedStyle(() => ({
-    opacity: withTiming(active.value, { duration: motion.duration.fast }),
-    transform: [{ scale: 0.82 + active.value * 0.18 }],
-  }));
   return (
     <Pressable onPress={() => { if (!focused) void triggerHaptic('selection'); onPress(); }} style={styles.tabItem} accessibilityRole="tab" accessibilityState={{ selected: focused }} accessibilityLabel={item.label}>
-      <Animated.View style={[styles.activeIndicator, { backgroundColor: `${primary}14` }, indicatorMotion]} />
-      <Animated.View style={[styles.iconWrapper, iconMotion]}>
+      <View style={styles.iconWrapper}>
         <Ionicons name={item.icon as any} size={22} color={focused ? primary : muted} />
-      </Animated.View>
-      <Text style={[styles.tabLabel, { color: focused ? primary : muted }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>{item.label}</Text>
+      </View>
+      <Text style={[styles.tabLabel, { color: focused ? primary : muted }, focused && styles.tabLabelActive]} numberOfLines={1} maxFontSizeMultiplier={1.3}>{item.label}</Text>
     </Pressable>
   );
 }
 
+// Escanear fica no centro, no mesmo nível das outras abas: um quadrado verde
+// discreto, sem brilho nem botão saltado para fora da barra.
 function ScannerTabItem({ focused, onPress, primary, action, muted }: { focused: boolean; onPress: () => void; primary: string; action: string; muted: string }) {
-  const active = useSharedValue(focused ? 1 : 0);
   const pressed = useSharedValue(0);
   const reduceMotion = useReducedMotion();
-  useEffect(() => {
-    active.value = reduceMotion ? (focused ? 1 : 0) : withSpring(focused ? 1 : 0, motion.spring.tab);
-  }, [active, focused, reduceMotion]);
   const buttonMotion = useAnimatedStyle(() => ({
-    transform: [{ scale: reduceMotion ? 1 : (1 + active.value * 0.055) * (pressed.value ? 0.94 : 1) }],
+    transform: [{ scale: reduceMotion ? 1 : (pressed.value ? 0.94 : 1) }],
   }));
-  const glowMotion = useAnimatedStyle(() => ({ opacity: 0.12 + active.value * 0.2, transform: [{ scale: 1 + active.value * 0.12 }] }));
   return (
     <Pressable
       onPress={() => { void triggerHaptic('medium'); onPress(); }}
       onPressIn={() => { pressed.set(withSpring(1, motion.spring.button)); }}
       onPressOut={() => { pressed.set(withSpring(0, motion.spring.button)); }}
-      style={styles.scannerTabItem}
+      style={styles.tabItem}
       accessibilityRole="tab"
       accessibilityState={{ selected: focused }}
       accessibilityLabel="Escanear refeição"
     >
-      <Animated.View style={[styles.scannerGlow, { backgroundColor: action }, glowMotion]} />
-      <Animated.View style={buttonMotion}>
-        <View style={[styles.scannerButton, { backgroundColor: action }]}>
-          <Ionicons name="scan-outline" size={24} color="#FFFFFF" />
-        </View>
+      <Animated.View style={[styles.scannerButton, { backgroundColor: action }, buttonMotion]}>
+        <Ionicons name="scan-outline" size={20} color="#FFFFFF" />
       </Animated.View>
-      <Text style={[styles.tabLabel, { color: focused ? primary : muted, marginTop: 4 }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>Escanear</Text>
+      <Text style={[styles.tabLabel, { color: focused ? primary : muted }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>Escanear</Text>
     </Pressable>
   );
 }
@@ -90,7 +68,7 @@ export default function TabLayout() {
         const onCamera = state.routes[state.index]?.name === 'scanner';
         const barColors = onCamera
           ? { bg: '#0B0F0D', border: '#2A312D', active: '#3DD68C', muted: '#A3ADA7' }
-          : { bg: colors.bgNav, border: colors.borderColor, active: colors.brandText, muted: colors.textLight };
+          : { bg: colors.bgNav, border: colors.hairline, active: colors.textMain, muted: colors.textLight };
         return (
           <View
             style={[
@@ -204,21 +182,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth * 2,
     minHeight: layout.tabBarHeight,
     paddingTop: 6,
     zIndex: 10,
-    ...Platform.select({
-      ios: {
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: -4 },
-      },
-      android: {
-        elevation: 8,
-      },
-    }),
   },
   tabItem: {
     flex: 1,
@@ -227,7 +194,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  activeIndicator: { position: 'absolute', top: 2, width: 56, height: 30, borderRadius: 15 },
   iconWrapper: {
     width: 32,
     height: 32,
@@ -237,28 +203,8 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.1,
+    fontWeight: '400',
   },
-  scannerTabItem: {
-    flex: 1.2,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingBottom: 6,
-    marginTop: -24, // O botão central sobe acima da barra; o rótulo fica na mesma linha dos outros.
-    position: 'relative',
-  },
-  scannerGlow: { position: 'absolute', top: -4, width: 60, height: 60, borderRadius: 22 },
-  scannerButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#13804A',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 6,
-  },
+  tabLabelActive: { fontWeight: '600' },
+  scannerButton: { width: 40, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
 });
