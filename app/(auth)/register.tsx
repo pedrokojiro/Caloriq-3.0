@@ -6,13 +6,12 @@ import { Image } from 'expo-image';
 import { BaseScreen, Button, Input } from '../../src/components';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAuth } from '../../src/context/AuthContext';
-import { AuthMotionBackground } from '../../src/components/AuthMotionBackground';
 import { GoogleSignInButton } from '../../src/components/GoogleSignInButton';
 import { useReducedMotion } from 'react-native-reanimated';
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { colors, globalColors } = useTheme();
+  const { colors } = useTheme();
   const { register, loginWithGoogle } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -55,7 +54,6 @@ export default function RegisterScreen() {
 
   return (
     <BaseScreen scrollable contentContainerStyle={[styles.content, compact && styles.contentCompact]}>
-      <AuthMotionBackground />
       <Animated.View style={{ opacity: headerEntrance, transform: [{ translateY: headerEntrance.interpolate({ inputRange: [0, 1], outputRange: [-22, 0] }) }] }}>
       <View style={styles.topRow}>
         <Pressable onPress={() => router.back()} style={[styles.backButton, { backgroundColor: colors.bgCard, borderColor: colors.borderColor }]} accessibilityRole="button" accessibilityLabel="Voltar" hitSlop={4}>
@@ -65,7 +63,7 @@ export default function RegisterScreen() {
           <Image source={require('../../assets/images/caloriq-logo.png')} style={styles.logoImage} contentFit="contain" />
         </View>
       </View>
-      <Text style={[styles.eyebrow, { color: colors.brandText }]}>PASSO 1 DE 2</Text>
+      <Text style={[styles.eyebrow, { color: colors.textMuted }]}>Passo 1 de 2</Text>
       <Text style={[styles.title, { color: colors.textMain }]}>Crie sua conta</Text>
       <Text style={[styles.subtitle, { color: colors.textMuted }]}>Primeiro, seus dados de acesso. Depois vamos calcular metas feitas para você.</Text>
       </Animated.View>
@@ -98,13 +96,13 @@ export default function RegisterScreen() {
           onError={setError}
         />
         <View style={styles.securityRow}>
-          <Ionicons name="shield-checkmark-outline" size={16} color={globalColors.primary} />
+          <Ionicons name="lock-closed-outline" size={16} color={colors.textMuted} />
           <Text style={[styles.securityText, { color: colors.textMuted }]}>Seus dados ficam vinculados somente à sua conta.</Text>
         </View>
       </Animated.View>
 
       <Pressable onPress={() => router.replace('/(auth)/login')} style={styles.footer}>
-        <Text style={[styles.footerText, { color: colors.textMuted }]}>Já tem uma conta? <Text style={{ color: colors.brandText, fontWeight: '800' }}>Entrar</Text></Text>
+        <Text style={[styles.footerText, { color: colors.textMuted }]}>Já tem uma conta? <Text style={{ color: colors.brandText, fontWeight: '600' }}>Entrar</Text></Text>
       </Pressable>
     </BaseScreen>
   );
@@ -114,17 +112,17 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 24, paddingTop: 22, paddingBottom: 32, flexGrow: 1, overflow: 'hidden' },
   contentCompact: { paddingTop: 14, paddingBottom: 18 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 },
-  backButton: { width: 44, height: 44, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  backButton: { width: 48, height: 48, borderRadius: 24, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   logo: { width: 54, height: 54, borderRadius: 17, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   logoImage: { width: 46, height: 46 },
-  eyebrow: { fontSize: 12, lineHeight: 16, fontWeight: '800', letterSpacing: 1.2, marginBottom: 10 },
-  title: { fontSize: 28, lineHeight: 34, fontWeight: '800', letterSpacing: -0.5, marginBottom: 8 },
+  eyebrow: { fontSize: 13, lineHeight: 18, fontWeight: '600', marginBottom: 8 },
+  title: { fontSize: 28, lineHeight: 34, fontWeight: '600', letterSpacing: -0.5, marginBottom: 8 },
   subtitle: { fontSize: 16, lineHeight: 24, marginBottom: 24, maxWidth: 350 },
-  formCard: { borderRadius: 20, borderWidth: 1, padding: 16 },
+  formCard: { borderRadius: 16, borderWidth: 1, padding: 16 },
   error: { fontSize: 14, lineHeight: 20, marginTop: -4, marginBottom: 14 },
   button: { height: 52 },
   securityRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 15, gap: 6 },
-  securityText: { fontSize: 12, lineHeight: 16, flexShrink: 1 },
+  securityText: { fontSize: 13, lineHeight: 18, flexShrink: 1 },
   footer: { alignItems: 'center', justifyContent: 'center', minHeight: 48, padding: 16 },
   footerText: { fontSize: 14, lineHeight: 20 },
 });

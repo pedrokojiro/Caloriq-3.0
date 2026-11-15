@@ -6,7 +6,6 @@ import { Image } from 'expo-image';
 import { BaseScreen, Button, Input } from '../../src/components';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAuth } from '../../src/context/AuthContext';
-import { AuthMotionBackground } from '../../src/components/AuthMotionBackground';
 import { GoogleSignInButton } from '../../src/components/GoogleSignInButton';
 import { useReducedMotion } from 'react-native-reanimated';
 
@@ -23,7 +22,7 @@ function useKeyboardVisible() {
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { colors, globalColors } = useTheme();
+  const { colors } = useTheme();
   const { login, loginWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -66,7 +65,6 @@ export default function LoginScreen() {
 
   return (
     <BaseScreen scrollable contentContainerStyle={[styles.content, compact && styles.contentCompact, keyboard && styles.contentKeyboard]}>
-      <AuthMotionBackground />
       <View style={[styles.authPanel, width >= 600 && styles.authPanelWide]}>
       <Animated.View style={[styles.header, keyboard && styles.headerKeyboard, {
         opacity: headerEntrance,
@@ -77,8 +75,7 @@ export default function LoginScreen() {
         </View>
         <View style={keyboard ? styles.headerKeyboardCopy : undefined}>
           <View style={styles.brandRow}>
-            <View style={[styles.brandDot, { backgroundColor: globalColors.primary }]} />
-            <Text style={[styles.brand, { color: colors.brandText }]}>CALORIQ</Text>
+            <Text style={[styles.brand, { color: colors.textMuted }]}>CaloriQ</Text>
           </View>
           <Text style={[styles.title, compact && styles.titleCompact, keyboard && styles.titleKeyboard, { color: colors.textMain }]}>Bem-vindo de volta</Text>
         </View>
@@ -137,7 +134,7 @@ export default function LoginScreen() {
       {keyboard ? null : (
         <Animated.View style={{ opacity: formEntrance }}>
           <Pressable onPress={() => router.push('/(auth)/register')} style={styles.footer} accessibilityRole="link">
-            <Text style={[styles.footerText, { color: colors.textMuted }]}>Ainda não tem conta? <Text style={{ color: colors.brandText, fontWeight: '800' }}>Criar agora</Text></Text>
+            <Text style={[styles.footerText, { color: colors.textMuted }]}>Ainda não tem conta? <Text style={{ color: colors.brandText, fontWeight: '600' }}>Criar agora</Text></Text>
           </Pressable>
         </Animated.View>
       )}
@@ -157,15 +154,14 @@ const styles = StyleSheet.create({
   headerKeyboardCopy: { flex: 1 },
   logo: { alignItems: 'center', justifyContent: 'center', marginBottom: 12, borderWidth: 1 },
   brandRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  brandDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
-  brand: { fontSize: 12, lineHeight: 16, fontWeight: '800', letterSpacing: 1.2 },
-  title: { fontSize: 28, lineHeight: 34, fontWeight: '800', letterSpacing: -0.5, marginBottom: 8 },
+  brand: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
+  title: { fontSize: 28, lineHeight: 34, fontWeight: '600', letterSpacing: -0.6, marginBottom: 8 },
   titleCompact: { fontSize: 24, lineHeight: 30 },
   titleKeyboard: { fontSize: 22, lineHeight: 28, marginBottom: 0 },
   subtitle: { fontSize: 16, lineHeight: 24, maxWidth: 340 },
-  formCard: { borderRadius: 20, borderWidth: 1, padding: 16 },
+  formCard: { borderRadius: 16, borderWidth: 1, padding: 16 },
   forgot: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center', paddingHorizontal: 4, marginTop: -8, marginBottom: 6 },
-  forgotText: { fontSize: 14, fontWeight: '700' },
+  forgotText: { fontSize: 14, fontWeight: '600' },
   error: { fontSize: 14, lineHeight: 20, marginBottom: 12 },
   footer: { alignItems: 'center', justifyContent: 'center', minHeight: 48, padding: 16 },
   footerText: { fontSize: 14, lineHeight: 20 },

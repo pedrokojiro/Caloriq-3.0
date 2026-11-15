@@ -5,7 +5,6 @@ import { Image } from 'expo-image';
 import { BaseScreen, Button, Card } from '../../src/components';
 import { useTheme } from '../../src/hooks/useTheme';
 import Svg, { Path } from 'react-native-svg';
-import { AuthMotionBackground } from '../../src/components/AuthMotionBackground';
 import { useReducedMotion } from 'react-native-reanimated';
 
 export default function OnboardingScreen() {
@@ -47,7 +46,6 @@ export default function OnboardingScreen() {
       style={{ backgroundColor: '#FFFFFF' }} // Onboarding matches HTML white background
       contentContainerStyle={[styles.content, compact && styles.contentCompact]}
     >
-      <AuthMotionBackground />
       {/* Top Header - Status Bar styling & Logo */}
       <Animated.View style={[styles.header, {
         opacity: heroEntrance,
@@ -198,12 +196,12 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     letterSpacing: 0.5,
   },
   title: {
     fontSize: 34,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#0D1117',
     textAlign: 'center',
     lineHeight: 38,
@@ -246,7 +244,7 @@ const styles = StyleSheet.create({
   },
   featureTitle: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#0D1117',
   },
   featureDesc: {
