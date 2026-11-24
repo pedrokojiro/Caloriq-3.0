@@ -90,8 +90,8 @@ A partir da versão 1.4.0 (versionCode 6), o app consulta `GET /api/app/version`
 
 | Variável | Exemplo | Uso |
 | --- | --- | --- |
-| `APP_LATEST_VERSION` | `1.4.0` | Texto exibido no aviso |
-| `APP_LATEST_VERSION_CODE` | `6` | Quem tem versionCode menor vê o aviso |
+| `APP_LATEST_VERSION` | `1.4.1` | Texto exibido no aviso |
+| `APP_LATEST_VERSION_CODE` | `7` | Quem tem versionCode menor vê o aviso |
 | `APP_MIN_VERSION_CODE` | `5` | Opcional. Abaixo disso, o aviso não pode ser adiado |
 | `APP_DOWNLOAD_URL` | `https://expo.dev/artifacts/eas/...apk` | Link HTTPS do APK |
 | `APP_RELEASE_NOTES` | `Recuperação de senha e relatórios em PDF.` | Opcional, até 500 caracteres |

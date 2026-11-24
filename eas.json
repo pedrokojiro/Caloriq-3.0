@@ -6,7 +6,8 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://caloriq-api-j61f.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://caloriq-api-j61f.onrender.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "62735054246-91gsld7mmnslokaatb8ui63ie0rhv061.apps.googleusercontent.com"
       },
       "android": {
         "buildType": "apk"
