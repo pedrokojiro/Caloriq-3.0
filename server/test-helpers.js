@@ -154,7 +154,7 @@ async function startServer(app) {
     const text = await response.text();
     return { status: response.status, headers: response.headers, body: text ? JSON.parse(text) : undefined };
   };
-  return { call, close: () => new Promise(resolve => server.close(resolve)) };
+  return { call, baseUrl, close: () => new Promise(resolve => server.close(resolve)) };
 }
 
 module.exports = { fakePool, memoryDatabase, startServer };

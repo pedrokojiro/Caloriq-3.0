@@ -7,8 +7,22 @@ const MAX_BYTES = 4 * 1024 * 1024;
 const ANGLES = new Set(['front', 'side', 'back']);
 const EXTENSIONS = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 
+// Rota pública (a assinatura do link faz o papel da autenticação): entrega a imagem.
+function registerPhotoFile(app, { storage }) {
+  app.get('/api/photos/file', async (request, response, next) => {
+    if (!storage.readSigned) return response.status(404).json({ error: 'Foto não encontrada.' });
+    try {
+      const file = await storage.readSigned({ path: String(request.query.path || ''), exp: request.query.exp, sig: request.query.sig });
+      if (!file) return response.status(404).json({ error: 'Link da foto inválido ou expirado.' });
+      response.set({ 'Content-Type': file.contentType, 'Cache-Control': 'private, max-age=3000', 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': 'inline' });
+      response.send(file.data);
+    } catch (error) { next(error); }
+  });
+}
+
 function registerPhotos(app, { pool, storage, limits }) {
   const uploadLimiter = new FixedWindowLimiter(limits.photoUpload);
+  const baseUrl = request => `${request.protocol}://${request.get('host')}/api`;
   const disabled = response => response.status(503).json({ error: 'O armazenamento de fotos na nuvem não está configurado no servidor.', code: 'STORAGE_DISABLED' });
 
   app.get('/api/photos', async (request, response, next) => {
@@ -18,7 +32,7 @@ function registerPhotos(app, { pool, storage, limits }) {
         'SELECT id, storage_path, angle, weight, taken_at FROM progress_photos WHERE user_id = $1 ORDER BY taken_at DESC',
         [request.userId]
       );
-      const urls = await storage.signedUrls(result.rows.map(row => row.storage_path));
+      const urls = await storage.signedUrls(result.rows.map(row => row.storage_path), 3600, { baseUrl: baseUrl(request) });
       response.set('Cache-Control', 'no-store');
       response.json({
         photos: result.rows.filter(row => urls.has(row.storage_path)).map(row => ({
@@ -55,7 +69,7 @@ function registerPhotos(app, { pool, storage, limits }) {
         await storage.remove([path]).catch(() => undefined);
         throw error;
       }
-      const urls = await storage.signedUrls([path]);
+      const urls = await storage.signedUrls([path], 3600, { baseUrl: baseUrl(request) });
       response.status(201).json({ photo: { id, url: urls.get(path), angle: body.angle, weight: weight ?? undefined, createdAt: takenAt.toISOString() } });
     } catch (error) { next(error); }
   });
@@ -77,4 +91,4 @@ async function collectUserPhotoPaths(pool, userId) {
   return result.rows.map(row => row.storage_path);
 }
 
-module.exports = { registerPhotos, collectUserPhotoPaths, MAX_BYTES };
+module.exports = { registerPhotos, registerPhotoFile, collectUserPhotoPaths, MAX_BYTES };

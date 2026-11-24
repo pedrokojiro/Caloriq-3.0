@@ -108,6 +108,21 @@ CREATE TABLE IF NOT EXISTS progress_photos (
 );
 CREATE INDEX IF NOT EXISTS progress_photos_user_idx ON progress_photos(user_id, taken_at DESC);
 
+-- Fotos guardadas no próprio banco quando o Supabase Storage não está configurado.
+CREATE TABLE IF NOT EXISTS photo_blobs (
+  path TEXT PRIMARY KEY,
+  content_type TEXT NOT NULL,
+  data BYTEA NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Segredos gerados pelo próprio servidor (por exemplo, a chave dos links assinados das fotos).
+CREATE TABLE IF NOT EXISTS app_secrets (
+  name TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Remove os registros de demonstração criados pelas versões antigas.
 -- Contas e refeições reais usam UUIDs e não são afetadas.
 DELETE FROM users WHERE id = 'local-user';

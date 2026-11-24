@@ -50,6 +50,7 @@ async function setup({ users = [] } = {}) {
     if (/^INSERT INTO users/.test(text)) { db.users.push({ id: params[0], name: params[1], email: params[2], password_hash: null, google_sub: params[3], onboarding_completed: false }); return; }
     if (/^INSERT INTO nutrition_goals/.test(text)) { db.goals.push(params[0]); return; }
     if (/^INSERT INTO auth_sessions/.test(text)) { db.sessions.push({ user_id: params[1], device: params[3] }); return; }
+    if (/^SELECT storage_path FROM progress_photos/.test(text)) return rows([]);
     if (/^SELECT password_hash FROM users/.test(text)) return rows(db.users.filter(u => u.id === params[0]));
     if (/password_hash IS NOT NULL AS has_password/.test(text)) { const u = db.users.find(x => x.id === params[0]); return rows([{ has_password: Boolean(u.password_hash), google_linked: Boolean(u.google_sub) }]); }
     if (/^UPDATE users SET password_hash/.test(text)) { db.users.find(u => u.id === params[0]).password_hash = params[1]; return; }

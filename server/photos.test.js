@@ -120,3 +120,64 @@ test('cliente do Supabase Storage monta as chamadas REST e detecta tipos', async
   assert.equal(createStorage({ url: '', serviceKey: '' }).enabled, false);
   assert.equal(detectImageType(Buffer.from('GIF89a')), null);
 });
+
+// ---- Armazenamento no próprio banco (sem Supabase) ----
+const { createDatabaseStorage } = require('./storage');
+
+function blobPool() {
+  const blobs = new Map(); const secrets = new Map();
+  const pool = { async query(sql, params) {
+    const text = sql.replace(/\s+/g, ' ').trim();
+    if (/^INSERT INTO app_secrets/.test(text)) { if (!secrets.has(params[0])) secrets.set(params[0], params[1]); return { rows: [], rowCount: 1 }; }
+    if (/^SELECT value FROM app_secrets/.test(text)) return { rows: [{ value: secrets.get(params[0]) }], rowCount: 1 };
+    if (/^INSERT INTO photo_blobs/.test(text)) { blobs.set(params[0], { content_type: params[1], data: params[2] }); return { rows: [], rowCount: 1 }; }
+    if (/^SELECT content_type, data FROM photo_blobs/.test(text)) return { rows: blobs.has(params[0]) ? [blobs.get(params[0])] : [], rowCount: blobs.has(params[0]) ? 1 : 0 };
+    if (/^DELETE FROM photo_blobs/.test(text)) { params[0].forEach(path => blobs.delete(path)); return { rows: [], rowCount: params[0].length }; }
+    throw new Error(`SQL não simulado: ${text.slice(0, 70)}`);
+  } };
+  return { pool, blobs, secrets };
+}
+
+test('banco como armazenamento: o link assinado entrega a foto e recusa adulteração ou expiração', async () => {
+  let clock = 1_000_000;
+  const { pool } = blobPool();
+  const storage = createDatabaseStorage({ pool, now: () => clock });
+  const bytes = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(8, 7)]);
+  await storage.upload('user-a/foto.jpg', bytes, 'image/jpeg');
+  const url = (await storage.signedUrls(['user-a/foto.jpg'], 3600, { baseUrl: 'https://api.test/api/' })).get('user-a/foto.jpg');
+  assert.match(url, /^https:\/\/api\.test\/api\/photos\/file\?/);
+  const params = Object.fromEntries(new URL(url).searchParams);
+  assert.deepEqual((await storage.readSigned(params)).data, bytes);
+  assert.equal(await storage.readSigned({ ...params, path: 'user-b/foto.jpg' }), null, 'não vale para outro arquivo');
+  assert.equal(await storage.readSigned({ ...params, sig: params.sig.replace(/.$/, c => (c === '0' ? '1' : '0')) }), null, 'assinatura adulterada');
+  assert.equal(await storage.readSigned({ ...params, exp: String(Number(params.exp) + 999) }), null, 'prazo estendido à mão');
+  clock += 3_601_000;
+  assert.equal(await storage.readSigned(params), null, 'expirado');
+  await storage.remove(['user-a/foto.jpg']);
+  clock = 1_000_000;
+  assert.equal(await storage.readSigned(params), null, 'removida');
+});
+
+test('rotas de foto funcionam de ponta a ponta usando só o banco, sem chaves externas', async () => {
+  const { pool: blobs } = blobPool();
+  const storage = createDatabaseStorage({ pool: blobs });
+  const { db, server } = await setup({ storage });
+  try {
+    const created = await server.call('POST', '/api/photos', { token: 'token-a', body: { imageBase64: JPEG, angle: 'front' } });
+    assert.equal(created.status, 201);
+    assert.match(created.body.photo.url, /\/api\/photos\/file\?path=user-a/);
+    // O link já assinado abre sem o token do app, como uma <Image> faria.
+    const open = await fetch(created.body.photo.url.replace(/^https?:\/\/[^/]+/, server.baseUrl));
+    assert.equal(open.status, 200);
+    assert.equal(open.headers.get('content-type'), 'image/jpeg');
+    assert.equal(open.headers.get('x-content-type-options'), 'nosniff');
+    const real = created.body.photo.url.replace(/^https?:\/\/[^/]+/, server.baseUrl);
+    const tampered = await fetch(real.replace(/.$/, ch => (ch === '0' ? '1' : '0')));
+    assert.equal(tampered.status, 404);
+    const list = await server.call('GET', '/api/photos', { token: 'token-a' });
+    assert.equal(list.body.photos.length, 1);
+    assert.equal((await server.call('GET', '/api/photos', { token: 'token-b' })).body.photos.length, 0, 'cada conta vê só as suas');
+    assert.equal((await server.call('DELETE', `/api/photos/${created.body.photo.id}`, { token: 'token-a' })).status, 204);
+    assert.equal(db.photos.length, 0);
+  } finally { await server.close(); }
+});

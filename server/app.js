@@ -12,8 +12,8 @@ const { createGoogleVerifier, registerGoogleAuth } = require('./google-auth');
 const { registerAccount, deviceLabel } = require('./account');
 const { registerReports } = require('./reports');
 const { registerAppVersion } = require('./app-version');
-const { createStorage } = require('./storage');
-const { registerPhotos, collectUserPhotoPaths } = require('./photos');
+const { chooseStorage } = require('./storage');
+const { registerPhotos, registerPhotoFile, collectUserPhotoPaths } = require('./photos');
 const { validateMeal, validateMealId, validateWaterChange, validateGoals, dayBounds, historyRange } = require('./validation');
 
 const DEFAULT_LIMITS = Object.freeze({
@@ -52,7 +52,7 @@ function trustProxyFromEnv(env = process.env) {
   return /^\d+$/.test(value) ? Number(value) : value;
 }
 
-function createApp({ pool, generateContent = defaultGenerateContent, sendEmail = createMailer(), limits = {}, trustProxy = trustProxyFromEnv(), env = process.env, storage = createStorage(), googleVerifier = createGoogleVerifier() }) {
+function createApp({ pool, generateContent = defaultGenerateContent, sendEmail = createMailer(), limits = {}, trustProxy = trustProxyFromEnv(), env = process.env, storage = chooseStorage(pool), googleVerifier = createGoogleVerifier() }) {
   const app = express();
   app.set('trust proxy', trustProxy);
   const settings = { ...DEFAULT_LIMITS, ...limits };
@@ -188,6 +188,9 @@ function createApp({ pool, generateContent = defaultGenerateContent, sendEmail =
       response.json({ status: 'ok', database: 'connected' });
     } catch (error) { next(error); }
   });
+
+  // O link assinado da foto não leva o token do usuário: precisa vir antes da autenticação.
+  registerPhotoFile(app, { storage });
 
   app.use('/api', rateLimit(authIpLimiter, request => request.ip, tooManyAuthRequests), authenticate);
 
