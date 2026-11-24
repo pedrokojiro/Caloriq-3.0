@@ -23,6 +23,7 @@ Com esta configuração, o celular acessa um endereço HTTPS fixo. Não é neces
 3. Preencha os valores secretos solicitados:
    - `DATABASE_URL`: URI copiada do Supabase.
    - `GEMINI_API_KEY`: chave válida do Google AI Studio.
+   - `GEMINI_FALLBACK_MODELS` (opcional): modelos reserva, separados por vírgula, usados quando o principal responde 503 (sobrecarga) ou 429. Padrão: `gemini-3.8-flash,gemini-3.5-flash-lite`. Deixe vazio para desligar.
 4. Após a implantação, abra `https://SEU-SERVICO.onrender.com/health`. O resultado esperado contém `"status":"ok"` e `"database":"connected"`.
 
 O servidor gratuito do Render dorme após um período sem uso. Antes da apresentação, abra `/health` e aguarde a primeira resposta.
